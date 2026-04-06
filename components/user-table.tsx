@@ -91,8 +91,9 @@ export function UserTable({ users, lang }: UserTableProps) {
           className="max-w-sm"
         />
         <Button
-          render={<Link href={`/${lang}/admin/users/new`} />}
           size="sm"
+          nativeButton={false}
+          render={<Link href={`/${lang}/admin/users/new`} />}
         >
           <PlusIcon className="size-4" data-icon="inline-start" />
           {dict.users.createUser}

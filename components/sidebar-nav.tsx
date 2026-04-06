@@ -17,15 +17,13 @@ export function SidebarNav({ items }: { items: NavItem[] }) {
       {items.map((item) => {
         const isActive = pathname.startsWith(item.href);
         return (
-          <Button
+          <Link
             key={item.href}
-            variant="ghost"
-            size="sm"
-            className={`justify-start ${isActive ? "bg-muted font-semibold" : ""}`}
-            render={<Link href={item.href} />}
+            href={item.href}
+            className={`inline-flex items-center justify-start gap-2 rounded-md px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors hover:bg-accent hover:text-accent-foreground ${isActive ? "bg-muted font-semibold" : ""}`}
           >
             {item.label}
-          </Button>
+          </Link>
         );
       })}
     </nav>

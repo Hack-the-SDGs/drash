@@ -115,6 +115,7 @@ export function PlayerTable({ players, userMap, lang }: PlayerTableProps) {
                     <Button
                       variant="ghost"
                       size="icon-sm"
+                      nativeButton={false}
                       render={<Link href={`/${lang}/admin/players/${player.uuid}`} />}
                     >
                       <PencilIcon className="size-4" />

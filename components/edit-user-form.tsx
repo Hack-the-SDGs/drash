@@ -378,6 +378,7 @@ export function EditUserForm({ user, lang, viewerRole }: EditUserFormProps) {
                   <Button
                     variant="ghost"
                     size="sm"
+                    nativeButton={false}
                     render={
                       <Link href={`/${lang}/admin/players/${player.uuid}`} />
                     }
