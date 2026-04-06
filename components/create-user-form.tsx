@@ -252,7 +252,7 @@ export function CreateUserForm({ lang, isRoot }: CreateUserFormProps) {
                       id="maxPlayerCount"
                       name="maxPlayerCount"
                       type="number"
-                      min={0}
+                      min={-2}
                     />
                   </div>
 

@@ -216,7 +216,7 @@ export function BatchCreateUsers({ lang, isRoot }: BatchCreateUsersProps) {
                     <TableCell>
                       <Input
                         type="number"
-                        min={0}
+                        min={-2}
                         value={row.maxPlayerCount}
                         onChange={(e) => updateRow(row.id, "maxPlayerCount", e.target.value)}
                         className="h-8 w-20"
