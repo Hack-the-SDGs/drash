@@ -7,6 +7,7 @@ import { PlayerHead } from "@/components/player-head";
 import { useDict } from "@/components/dict-provider";
 import { deletePlayerAction } from "@/lib/actions/players";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { CreatePlayerDialog } from "@/components/create-player-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -18,19 +19,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PencilIcon, Trash2Icon, SearchIcon } from "lucide-react";
-import type { APIPlayer } from "@/lib/types";
+import { PencilIcon, Trash2Icon, SearchIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon } from "lucide-react";
+import { useSortable } from "@/hooks/use-sortable";
+import type { APIPlayer, APIUser } from "@/lib/types";
 
 interface PlayerTableProps {
   players: APIPlayer[];
   userMap: Record<string, string>;
+  users: APIUser[];
   lang: string;
 }
 
-export function PlayerTable({ players, userMap, lang }: PlayerTableProps) {
+export function PlayerTable({ players, userMap, users, lang }: PlayerTableProps) {
   const dict = useDict();
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<APIPlayer | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const filtered = players.filter((p) => {
@@ -42,6 +46,21 @@ export function PlayerTable({ players, userMap, lang }: PlayerTableProps) {
     );
   });
 
+  const { sorted, sortKey, direction, toggleSort } = useSortable(filtered, {
+    defaultKey: "name",
+    defaultDirection: "asc",
+    sortFns: {
+      name: (a, b) => a.name.localeCompare(b.name),
+      owner: (a, b) => {
+        const ownerA = userMap[a.userUuid] ?? "";
+        const ownerB = userMap[b.userUuid] ?? "";
+        return ownerA.localeCompare(ownerB);
+      },
+      skinModel: (a, b) => a.skinModel.localeCompare(b.skinModel),
+      createdAt: (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    },
+  });
+
   function handleDelete(player: APIPlayer) {
     startTransition(async () => {
       const result = await deletePlayerAction(player.uuid);
@@ -51,6 +70,13 @@ export function PlayerTable({ players, userMap, lang }: PlayerTableProps) {
         toast.error(result.error ?? dict.errors.unknown);
       }
     });
+  }
+
+  function SortIcon({ colKey }: { colKey: string }) {
+    if (sortKey !== colKey) return null;
+    return direction === "asc"
+      ? <ArrowUpIcon className="inline size-3 ml-1" />
+      : <ArrowDownIcon className="inline size-3 ml-1" />;
   }
 
   return (
@@ -68,28 +94,59 @@ export function PlayerTable({ players, userMap, lang }: PlayerTableProps) {
         <Badge variant="secondary" className="whitespace-nowrap">
           {dict.common.total.replace("{count}", String(filtered.length))}
         </Badge>
+        <Button size="sm" onClick={() => setCreateOpen(true)}>
+          <PlusIcon className="size-4" data-icon="inline-start" />
+          {dict.player.createPlayer}
+        </Button>
       </div>
 
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>{dict.player.name}</TableHead>
+              <TableHead>
+                <button
+                  type="button"
+                  className="flex items-center"
+                  onClick={() => toggleSort("name")}
+                >
+                  {dict.player.name}
+                  <SortIcon colKey="name" />
+                </button>
+              </TableHead>
               <TableHead>{dict.player.uuid}</TableHead>
-              <TableHead>{dict.player.owner}</TableHead>
-              <TableHead>{dict.player.skinModel}</TableHead>
+              <TableHead>
+                <button
+                  type="button"
+                  className="flex items-center"
+                  onClick={() => toggleSort("owner")}
+                >
+                  {dict.player.owner}
+                  <SortIcon colKey="owner" />
+                </button>
+              </TableHead>
+              <TableHead>
+                <button
+                  type="button"
+                  className="flex items-center"
+                  onClick={() => toggleSort("skinModel")}
+                >
+                  {dict.player.skinModel}
+                  <SortIcon colKey="skinModel" />
+                </button>
+              </TableHead>
               <TableHead>{dict.common.actions}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.length === 0 ? (
+            {sorted.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center text-muted-foreground">
                   {dict.common.noData}
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((player) => (
+              sorted.map((player) => (
                 <TableRow key={player.uuid}>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -156,6 +213,8 @@ export function PlayerTable({ players, userMap, lang }: PlayerTableProps) {
         }}
         destructive
       />
+
+      <CreatePlayerDialog open={createOpen} onOpenChange={setCreateOpen} users={users} />
     </div>
   );
 }

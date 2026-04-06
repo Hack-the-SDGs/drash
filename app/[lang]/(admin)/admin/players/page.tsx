@@ -33,7 +33,7 @@ export default async function PlayersPage(
           <p className="text-muted-foreground">{dict.player.description}</p>
         </div>
       </div>
-      <PlayerTable players={playersWithTextures} userMap={userMap} lang={lang} />
+      <PlayerTable players={playersWithTextures} userMap={userMap} users={users} lang={lang} />
     </div>
   );
 }
