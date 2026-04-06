@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useCallback } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { PlayerHead } from "@/components/player-head";
@@ -19,8 +19,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PencilIcon, Trash2Icon, SearchIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon } from "lucide-react";
+import { PencilIcon, Trash2Icon, SearchIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, XIcon } from "lucide-react";
 import { useSortable } from "@/hooks/use-sortable";
+import { useSelection } from "@/hooks/use-selection";
 import { canDeletePlayer } from "@/lib/permissions";
 import type { APIPlayer, APIUser, Role } from "@/lib/types";
 
@@ -41,13 +42,11 @@ export function PlayerTable({ players, userMap, userRoleMap, users, lang, viewer
   const [deleteTarget, setDeleteTarget] = useState<APIPlayer | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
 
   /** Whether the current viewer can manage (edit/delete) a player */
   function canManage(player: APIPlayer): boolean {
     const ownerRole = userRoleMap[player.userUuid] ?? "user";
-    // root can manage all; admin can only manage user's players
     if (viewerRole === "root") return true;
     if (viewerRole === "admin" && ownerRole === "user") return true;
     return false;
@@ -77,37 +76,15 @@ export function PlayerTable({ players, userMap, userRoleMap, users, lang, viewer
     },
   });
 
-  // Only selectable players: those the viewer can manage
-  const selectableUuids = sorted.filter((p) => canManage(p)).map((p) => p.uuid);
-
-  const allSelected = selectableUuids.length > 0 && selectableUuids.every((id) => selected.has(id));
-  const someSelected = selectableUuids.some((id) => selected.has(id));
-
-  const toggleAll = useCallback(() => {
-    if (allSelected) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(selectableUuids));
-    }
-  }, [allSelected, selectableUuids]);
-
-  const toggleOne = useCallback((uuid: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(uuid)) next.delete(uuid);
-      else next.add(uuid);
-      return next;
-    });
-  }, []);
+  // Only selectable: players the viewer can manage
+  const selectableIds = sorted.filter((p) => canManage(p)).map((p) => p.uuid);
+  const { selected, handleClick, clearSelection } = useSelection(selectableIds);
 
   function handleDelete(player: APIPlayer) {
     startTransition(async () => {
       const result = await deletePlayerAction(player.uuid);
-      if (result.success) {
-        toast.success(dict.player.deleted);
-      } else {
-        toast.error(result.error ?? dict.errors.unknown);
-      }
+      if (result.success) toast.success(dict.player.deleted);
+      else toast.error(result.error ?? dict.errors.unknown);
       setDeleteTarget(null);
     });
   }
@@ -119,7 +96,7 @@ export function PlayerTable({ players, userMap, userRoleMap, users, lang, viewer
       const success = results.filter((r) => r.success).length;
       const failed = results.filter((r) => !r.success).length;
       toast.success(dict.player.batchDeleted.replace("{success}", String(success)).replace("{failed}", String(failed)));
-      setSelected(new Set());
+      clearSelection();
       setBatchDeleteOpen(false);
     });
   }
@@ -152,35 +129,10 @@ export function PlayerTable({ players, userMap, userRoleMap, users, lang, viewer
         </Button>
       </div>
 
-      {selected.size > 0 && (
-        <div className="flex items-center gap-2 rounded-lg border bg-muted/50 px-4 py-2">
-          <span className="text-sm font-medium">
-            {dict.player.selected.replace("{count}", String(selected.size))}
-          </span>
-          <div className="ml-auto flex items-center gap-2">
-            <Button size="sm" variant="destructive" onClick={() => setBatchDeleteOpen(true)} disabled={isPending}>
-              <Trash2Icon className="size-3.5" data-icon="inline-start" />
-              {dict.player.batchDelete}
-            </Button>
-          </div>
-        </div>
-      )}
-
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[40px]">
-                <input
-                  type="checkbox"
-                  className="size-4 accent-primary"
-                  checked={allSelected}
-                  ref={(el) => {
-                    if (el) el.indeterminate = someSelected && !allSelected;
-                  }}
-                  onChange={toggleAll}
-                />
-              </TableHead>
               <TableHead>
                 <button
                   type="button"
@@ -218,24 +170,23 @@ export function PlayerTable({ players, userMap, userRoleMap, users, lang, viewer
           <TableBody>
             {sorted.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                <TableCell colSpan={5} className="text-center text-muted-foreground">
                   {dict.common.noData}
                 </TableCell>
               </TableRow>
             ) : (
               sorted.map((player) => {
                 const manageable = canManage(player);
+                const isSelected = selected.has(player.uuid);
+
                 return (
-                  <TableRow key={player.uuid}>
-                    <TableCell>
-                      <input
-                        type="checkbox"
-                        className="size-4 accent-primary"
-                        checked={selected.has(player.uuid)}
-                        disabled={!manageable}
-                        onChange={() => toggleOne(player.uuid)}
-                      />
-                    </TableCell>
+                  <TableRow
+                    key={player.uuid}
+                    className={isSelected ? "bg-primary/10" : undefined}
+                    onClick={(e) => {
+                      if (manageable) handleClick(player.uuid, e);
+                    }}
+                  >
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <PlayerHead skinUrl={player.skinUrl} size={32} />
@@ -243,6 +194,9 @@ export function PlayerTable({ players, userMap, userRoleMap, users, lang, viewer
                           <Link
                             href={`/${lang}/admin/players/${player.uuid}`}
                             className="font-medium hover:underline"
+                            onClick={(e) => {
+                              if (e.metaKey || e.ctrlKey || e.shiftKey) e.preventDefault();
+                            }}
                           >
                             {player.name}
                           </Link>
@@ -258,6 +212,9 @@ export function PlayerTable({ players, userMap, userRoleMap, users, lang, viewer
                       <Link
                         href={`/${lang}/admin/users/${player.userUuid}`}
                         className="hover:underline"
+                        onClick={(e) => {
+                          if (e.metaKey || e.ctrlKey || e.shiftKey) e.preventDefault();
+                        }}
                       >
                         {userMap[player.userUuid] ?? player.userUuid}
                       </Link>
@@ -295,20 +252,37 @@ export function PlayerTable({ players, userMap, userRoleMap, users, lang, viewer
         </Table>
       </div>
 
+      {/* Fixed bottom batch action bar */}
+      {selected.size > 0 && (
+        <div className="fixed inset-x-0 bottom-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+          <div className="pointer-events-auto flex items-center gap-3 rounded-xl border bg-popover px-4 py-2.5 shadow-lg ring-1 ring-foreground/10">
+            <Button variant="ghost" size="icon-xs" onClick={clearSelection}>
+              <XIcon className="size-3.5" />
+            </Button>
+            <span className="text-sm font-medium">
+              {dict.player.selected.replace("{count}", String(selected.size))}
+            </span>
+            <div className="mx-1 h-5 w-px bg-border" />
+            <Button size="xs" variant="destructive" onClick={() => setBatchDeleteOpen(true)} disabled={isPending}>
+              <Trash2Icon className="size-3" data-icon="inline-start" />
+              {dict.player.batchDelete}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Single delete confirm */}
       <ConfirmDialog
         open={deleteTarget !== null}
-        onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null);
-        }}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
         title={dict.common.delete}
         description={`${dict.common.confirm}: ${deleteTarget?.name ?? ""}?`}
         confirmLabel={dict.common.delete}
-        onConfirm={() => {
-          if (deleteTarget) handleDelete(deleteTarget);
-        }}
+        onConfirm={() => { if (deleteTarget) handleDelete(deleteTarget); }}
         destructive
       />
 
+      {/* Batch delete confirm */}
       <ConfirmDialog
         open={batchDeleteOpen}
         onOpenChange={setBatchDeleteOpen}
