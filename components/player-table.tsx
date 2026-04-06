@@ -191,7 +191,7 @@ export function PlayerTable({ players, userMap, userRoleMap, users, lang, viewer
                   >
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <PlayerHead skinUrl={player.skinUrl} size={32} />
+                        <PlayerHead skinUrl={player.skinUrl} playerUuid={player.uuid} size={32} />
                         {manageable ? (
                           <Link
                             href={`/${lang}/admin/players/${player.uuid}`}

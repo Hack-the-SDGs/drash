@@ -2,9 +2,11 @@
 
 import { useRef, useEffect } from "react";
 import { UserIcon } from "lucide-react";
+import { getDefaultSkinUrl } from "@/lib/default-skin";
 
 interface PlayerHeadProps {
   skinUrl?: string;
+  playerUuid?: string;
   size?: number;
   className?: string;
 }
@@ -13,12 +15,14 @@ interface PlayerHeadProps {
  * Renders a Minecraft player head from a skin texture.
  * Extracts the 8x8 face from coordinates (8,8) in the skin,
  * plus the 8x8 hat overlay from (40,8), composited together.
+ * Falls back to the default Steve/Alex skin when no skinUrl is provided.
  */
-export function PlayerHead({ skinUrl, size = 48, className = "" }: PlayerHeadProps) {
+export function PlayerHead({ skinUrl, playerUuid, size = 48, className = "" }: PlayerHeadProps) {
+  const resolvedUrl = skinUrl || (playerUuid ? getDefaultSkinUrl(playerUuid) : undefined);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    if (!skinUrl || !canvasRef.current) return;
+    if (!resolvedUrl || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
@@ -40,7 +44,7 @@ export function PlayerHead({ skinUrl, size = 48, className = "" }: PlayerHeadPro
 
     img.onerror = () => {
       // Try fetching via blob to bypass CORS
-      fetch(skinUrl)
+      fetch(resolvedUrl)
         .then((res) => res.blob())
         .then((blob) => {
           const blobUrl = URL.createObjectURL(blob);
@@ -58,10 +62,10 @@ export function PlayerHead({ skinUrl, size = 48, className = "" }: PlayerHeadPro
         .catch(() => {});
     };
 
-    img.src = skinUrl;
-  }, [skinUrl, size]);
+    img.src = resolvedUrl;
+  }, [resolvedUrl, size]);
 
-  if (!skinUrl) {
+  if (!resolvedUrl) {
     return (
       <div
         className={`flex items-center justify-center rounded bg-muted ${className}`}

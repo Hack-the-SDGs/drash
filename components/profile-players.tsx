@@ -84,7 +84,7 @@ export function ProfilePlayers({
                 <Card key={player.uuid} className="transition-colors hover:bg-muted/50">
                   <Link href={`/${lang}/players/${player.uuid}`} className="block">
                     <CardContent className="flex items-start gap-4 p-4">
-                      <PlayerHead skinUrl={player.skinUrl} size={48} className="shrink-0" />
+                      <PlayerHead skinUrl={player.skinUrl} playerUuid={player.uuid} size={48} className="shrink-0" />
                       <div className="flex-1 space-y-1.5 overflow-hidden">
                         <p className="truncate text-sm font-medium">{player.name}</p>
                         <p className="truncate font-mono text-xs text-muted-foreground">{player.uuid}</p>
