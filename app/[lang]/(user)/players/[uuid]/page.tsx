@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/drasl/auth";
 import { getPlayer } from "@/lib/drasl/players";
+import { DraslAPIError } from "@/lib/drasl/client";
 import { getDictionary, hasLocale, type Locale } from "@/lib/dictionaries";
 import { SkinEditor } from "@/components/skin-editor";
 import { resolvePlayerTextures } from "@/lib/drasl/textures";
@@ -19,15 +20,17 @@ export default async function PlayerEditorPage(
   let user;
   try {
     user = await getCurrentUser();
-  } catch {
-    redirect(`/${lang}/login`);
+  } catch (e) {
+    if (e instanceof DraslAPIError) redirect(`/${lang}/login`);
+    throw e;
   }
 
   let player;
   try {
     player = await getPlayer(uuid);
-  } catch {
-    redirect(`/${lang}/profile`);
+  } catch (e) {
+    if (e instanceof DraslAPIError) redirect(`/${lang}/profile`);
+    throw e;
   }
 
   // Verify the player belongs to the current user

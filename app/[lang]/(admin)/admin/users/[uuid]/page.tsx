@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getSession, getRole } from "@/lib/drasl/auth";
 import { getDictionary, type Locale } from "@/lib/dictionaries";
 import { getUser } from "@/lib/drasl/users";
+import { DraslAPIError } from "@/lib/drasl/client";
 import { EditUserForm } from "@/components/edit-user-form";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -20,8 +21,9 @@ export default async function EditUserPage(
   let user;
   try {
     user = await getUser(uuid);
-  } catch {
-    notFound();
+  } catch (e) {
+    if (e instanceof DraslAPIError) notFound();
+    throw e;
   }
 
   const targetRole = getRole(user);

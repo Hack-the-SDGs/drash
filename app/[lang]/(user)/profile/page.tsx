@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/drasl/auth";
+import { DraslAPIError } from "@/lib/drasl/client";
 import { getRole } from "@/lib/drasl/auth";
 import { resolvePlayerTextures } from "@/lib/drasl/textures";
 import { getDictionary, hasLocale, type Locale } from "@/lib/dictionaries";
@@ -38,8 +39,9 @@ export default async function ProfilePage(
   let user;
   try {
     user = await getCurrentUser();
-  } catch {
-    redirect(`/${lang}/login`);
+  } catch (e) {
+    if (e instanceof DraslAPIError) redirect(`/${lang}/login`);
+    throw e;
   }
 
   // Resolve textures for all players (handles Mojang fallback)
