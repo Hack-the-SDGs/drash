@@ -150,7 +150,7 @@ export function CreatePlayerDialog({
               <Label>{dict.player.selectOwner}</Label>
               <Select
                 value={selectedUserUuid}
-                onValueChange={setSelectedUserUuid}
+                onValueChange={(v) => setSelectedUserUuid(v ?? "")}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder={dict.player.selectOwner} />
@@ -177,7 +177,7 @@ export function CreatePlayerDialog({
               {/* Skin model */}
               <div className="space-y-1.5">
                 <Label>{dict.player.skinModel}</Label>
-                <Select value={skinModel} onValueChange={setSkinModel}>
+                <Select value={skinModel} onValueChange={(v) => setSkinModel(v ?? "classic")}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
