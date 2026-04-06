@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/drasl/auth";
 import { getRole } from "@/lib/drasl/auth";
+import { resolvePlayerTextures } from "@/lib/drasl/textures";
 import { getDictionary, hasLocale, type Locale } from "@/lib/dictionaries";
 import {
   Card,
@@ -48,6 +49,14 @@ export default async function ProfilePage(
   } catch {
     redirect(`/${lang}/login`);
   }
+
+  // Resolve textures for all players (handles Mojang fallback)
+  const playersWithTextures = await Promise.all(
+    user.players.map(async (player) => {
+      const textures = await resolvePlayerTextures(player);
+      return { ...player, ...textures };
+    }),
+  );
 
   const role = getRole(user);
 
@@ -159,7 +168,7 @@ export default async function ProfilePage(
           </Card>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {user.players.map((player) => (
+            {playersWithTextures.map((player) => (
               <Card key={player.uuid}>
                 <CardContent className="flex items-start gap-4 p-4">
                   {/* Skin thumbnail - bigger */}

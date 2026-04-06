@@ -2,6 +2,7 @@ import { getDictionary, type Locale } from "@/lib/dictionaries";
 import { getPlayers } from "@/lib/drasl/players";
 import { getUsers } from "@/lib/drasl/users";
 import { PlayerTable } from "@/components/player-table";
+import { resolvePlayerTextures } from "@/lib/drasl/textures";
 
 export default async function PlayersPage(
   props: PageProps<"/[lang]/admin/players">,
@@ -10,6 +11,14 @@ export default async function PlayersPage(
   const dict = await getDictionary(lang as Locale);
 
   const [players, users] = await Promise.all([getPlayers(), getUsers()]);
+
+  // Resolve textures for all players (handles Mojang fallback)
+  const playersWithTextures = await Promise.all(
+    players.map(async (player) => {
+      const textures = await resolvePlayerTextures(player);
+      return { ...player, ...textures };
+    }),
+  );
 
   const userMap: Record<string, string> = {};
   for (const user of users) {
@@ -24,7 +33,7 @@ export default async function PlayersPage(
           <p className="text-muted-foreground">{dict.player.description}</p>
         </div>
       </div>
-      <PlayerTable players={players} userMap={userMap} lang={lang} />
+      <PlayerTable players={playersWithTextures} userMap={userMap} lang={lang} />
     </div>
   );
 }

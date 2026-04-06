@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/drasl/auth";
 import { getPlayer } from "@/lib/drasl/players";
 import { getDictionary, hasLocale, type Locale } from "@/lib/dictionaries";
 import { SkinEditor } from "@/components/skin-editor";
+import { resolvePlayerTextures } from "@/lib/drasl/textures";
 
 export default async function PlayerEditorPage(
   props: { params: Promise<{ lang: string; uuid: string }> },
@@ -34,9 +35,13 @@ export default async function PlayerEditorPage(
     redirect(`/${lang}/profile`);
   }
 
+  // Resolve textures (handles Mojang fallback)
+  const textures = await resolvePlayerTextures(player);
+  const playerWithTextures = { ...player, ...textures };
+
   return (
     <SkinEditor
-      player={player}
+      player={playerWithTextures}
       dict={dict.player}
       commonDict={dict.common}
       lang={lang}
