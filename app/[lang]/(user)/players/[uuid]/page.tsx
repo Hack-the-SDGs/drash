@@ -5,6 +5,7 @@ import { DraslAPIError } from "@/lib/drasl/client";
 import { getDictionary, hasLocale, type Locale } from "@/lib/dictionaries";
 import { SkinEditor } from "@/components/skin-editor";
 import { resolvePlayerTextures } from "@/lib/drasl/textures";
+import { isMojangPlayer } from "@/lib/permissions";
 
 export default async function PlayerEditorPage(
   props: { params: Promise<{ lang: string; uuid: string }> },
@@ -48,6 +49,7 @@ export default async function PlayerEditorPage(
       dict={dict.player}
       commonDict={dict.common}
       lang={lang}
+      readonly={isMojangPlayer(player)}
     />
   );
 }
