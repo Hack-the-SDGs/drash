@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { SkinViewer, IdleAnimation } from "skinview3d";
 
 interface SkinViewerProps {
@@ -9,6 +9,19 @@ interface SkinViewerProps {
   skinModel?: "classic" | "slim";
   width?: number;
   height?: number;
+}
+
+/**
+ * Fetch an image URL and return a blob URL.
+ * This avoids CORS issues with the skinview3d library, which sets
+ * crossOrigin="anonymous" on Image elements. If the texture server
+ * doesn't return CORS headers, the image load fails silently.
+ * By fetching via fetch() and creating a blob URL, we sidestep this.
+ */
+async function fetchAsBlobUrl(url: string): Promise<string> {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
 }
 
 export function SkinViewerComponent({
@@ -20,6 +33,14 @@ export function SkinViewerComponent({
 }: SkinViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewerRef = useRef<SkinViewer | null>(null);
+  const blobUrlsRef = useRef<string[]>([]);
+
+  const revokeBlobUrls = useCallback(() => {
+    for (const url of blobUrlsRef.current) {
+      URL.revokeObjectURL(url);
+    }
+    blobUrlsRef.current = [];
+  }, []);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -28,8 +49,6 @@ export function SkinViewerComponent({
       canvas: canvasRef.current,
       width,
       height,
-      skin: skinUrl || undefined,
-      cape: capeUrl || undefined,
       model: skinModel === "slim" ? "slim" : "default",
       background: 0x1a1a2e,
       animation: new IdleAnimation(),
@@ -44,8 +63,9 @@ export function SkinViewerComponent({
     return () => {
       viewer.dispose();
       viewerRef.current = null;
+      revokeBlobUrls();
     };
-    // Only run on mount/unmount; updates handled by the effect below
+    // Only run on mount/unmount; updates handled by the effects below
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -54,13 +74,44 @@ export function SkinViewerComponent({
     const viewer = viewerRef.current;
     if (!viewer) return;
 
-    if (skinUrl) {
+    if (!skinUrl) {
+      viewer.loadSkin(null);
+      return;
+    }
+
+    // For blob:/data: URLs (local previews), load directly
+    if (skinUrl.startsWith("blob:") || skinUrl.startsWith("data:")) {
       viewer.loadSkin(skinUrl, {
         model: skinModel === "slim" ? "slim" : "default",
       });
-    } else {
-      viewer.loadSkin(null);
+      return;
     }
+
+    // For remote URLs, fetch as blob to avoid CORS issues
+    let cancelled = false;
+    fetchAsBlobUrl(skinUrl)
+      .then((blobUrl) => {
+        if (cancelled) {
+          URL.revokeObjectURL(blobUrl);
+          return;
+        }
+        blobUrlsRef.current.push(blobUrl);
+        viewer.loadSkin(blobUrl, {
+          model: skinModel === "slim" ? "slim" : "default",
+        });
+      })
+      .catch(() => {
+        // Fallback: try loading the URL directly
+        if (!cancelled) {
+          viewer.loadSkin(skinUrl, {
+            model: skinModel === "slim" ? "slim" : "default",
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [skinUrl, skinModel]);
 
   // Update cape when props change
@@ -68,11 +119,38 @@ export function SkinViewerComponent({
     const viewer = viewerRef.current;
     if (!viewer) return;
 
-    if (capeUrl) {
-      viewer.loadCape(capeUrl);
-    } else {
+    if (!capeUrl) {
       viewer.loadCape(null);
+      return;
     }
+
+    // For blob:/data: URLs (local previews), load directly
+    if (capeUrl.startsWith("blob:") || capeUrl.startsWith("data:")) {
+      viewer.loadCape(capeUrl);
+      return;
+    }
+
+    // For remote URLs, fetch as blob to avoid CORS issues
+    let cancelled = false;
+    fetchAsBlobUrl(capeUrl)
+      .then((blobUrl) => {
+        if (cancelled) {
+          URL.revokeObjectURL(blobUrl);
+          return;
+        }
+        blobUrlsRef.current.push(blobUrl);
+        viewer.loadCape(blobUrl);
+      })
+      .catch(() => {
+        // Fallback: try loading the URL directly
+        if (!cancelled) {
+          viewer.loadCape(capeUrl);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [capeUrl]);
 
   return (

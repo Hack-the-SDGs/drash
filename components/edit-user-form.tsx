@@ -203,7 +203,7 @@ export function EditUserForm({ user, lang, viewerRole }: EditUserFormProps) {
   }
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="max-w-6xl space-y-6">
       {/* Basic Info */}
       <Card>
         <CardHeader>

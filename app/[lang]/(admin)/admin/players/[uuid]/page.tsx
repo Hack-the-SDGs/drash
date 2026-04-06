@@ -25,7 +25,7 @@ export default async function EditPlayerPage(
   const owner = users.find((u) => u.uuid === player.userUuid);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       <AdminPlayerEditor
         player={player}
         ownerUsername={owner?.username}

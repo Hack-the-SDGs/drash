@@ -23,6 +23,7 @@ export function PageHeader({
             variant="ghost"
             size="icon"
             className="mt-0.5 shrink-0"
+            nativeButton={false}
             render={<Link href={backHref} />}
           >
             <ArrowLeftIcon className="size-4" />

@@ -17,12 +17,14 @@ export function AdminMobileSidebar({
   appName,
   navItems,
   rootNavItems,
+  profileNavItems,
   username,
   role,
 }: {
   appName: string;
   navItems: NavItem[];
   rootNavItems: NavItem[];
+  profileNavItems: NavItem[];
   username: string;
   role: string;
 }) {
@@ -48,6 +50,8 @@ export function AdminMobileSidebar({
               <SidebarNav items={rootNavItems} />
             </>
           )}
+          <Separator className="my-3" />
+          <SidebarNav items={profileNavItems} />
         </div>
         {/* User info at bottom */}
         <div className="border-t px-4 py-3">

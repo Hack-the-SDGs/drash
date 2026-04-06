@@ -36,6 +36,7 @@ export default async function UserLayout(
               <Button
                 variant="outline"
                 size="sm"
+                nativeButton={false}
                 render={<Link href={`/${lang}/admin/users`} />}
               >
                 <ShieldIcon className="size-4" />

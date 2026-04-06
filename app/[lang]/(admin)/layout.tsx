@@ -15,6 +15,7 @@ import {
   Gamepad2,
   TicketPlus,
   ShieldCheck,
+  UserCircle,
 } from "lucide-react";
 
 export default async function AdminLayout(
@@ -59,6 +60,14 @@ export default async function AdminLayout(
         ]
       : [];
 
+  const profileNavItems: NavItem[] = [
+    {
+      label: dict.nav.profile,
+      href: `/${lang}/profile`,
+      icon: <UserCircle />,
+    },
+  ];
+
   return (
     <div className="flex min-h-screen">
       {/* Desktop sidebar */}
@@ -82,6 +91,8 @@ export default async function AdminLayout(
               <SidebarNav items={rootNavItems} />
             </>
           )}
+          <Separator className="my-3" />
+          <SidebarNav items={profileNavItems} />
         </div>
 
         {/* User info at bottom */}
@@ -112,6 +123,7 @@ export default async function AdminLayout(
               appName={dict.common.appName}
               navItems={navItems}
               rootNavItems={rootNavItems}
+              profileNavItems={profileNavItems}
               username={session.username}
               role={session.role}
             />

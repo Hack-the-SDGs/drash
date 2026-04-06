@@ -157,7 +157,7 @@ export function SkinEditor({ player, dict, commonDict, lang }: SkinEditorProps) 
       </div>
 
       {/* Main content: 3D viewer + editor tabs */}
-      <div className="grid gap-6 lg:grid-cols-[auto_1fr]">
+      <div className="grid gap-6 md:grid-cols-[auto_1fr]">
         {/* 3D Viewer */}
         <Card className="w-fit">
           <CardContent className="flex items-center justify-center p-4">
