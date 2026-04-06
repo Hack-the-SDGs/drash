@@ -1,36 +1,126 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+<div align="center">
 
-## Getting Started
+[![Banner](https://github.com/Hack-the-SDGs/drash/blob/main/.github/assets/banner.png?raw=true)](https://github.com/Hack-the-SDGs/drash)
+[![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=white)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 
-First, run the development server:
+</div>
+
+## 總覽
+
+Drash 是 [Drasl](https://github.com/unmojang/drasl) 的現代化 Web 管理面板，讓你透過直覺的介面管理 Minecraft 驗證伺服器的使用者、角色與外觀。
+
+底層使用 Next.js App Router + Server Actions 與 Drasl API v2 溝通，前端採 shadcn/ui 元件庫搭配 Tailwind CSS，並以 skinview3d 提供 3D 皮膚預覽。
+
+### 特色
+
+- **使用者管理** — 建立、編輯、鎖定、刪除使用者帳號，支援角色權限控管
+- **角色管理** — 建立 Minecraft 角色、自訂 UUID、上傳皮膚與披風
+- **3D 皮膚預覽** — 即時渲染角色皮膚，支援 classic / slim 模型
+- **邀請碼系統** — 產生與管理邀請碼，控制註冊流程
+- **管理員控制** — 分層權限（root / admin / user），root 可管理管理員
+- **多語系** — 支援繁體中文與英文，自動偵測瀏覽器語系
+- **深色主題** — 預設深色介面，支援明暗切換
+
+## 前置需求
+
+| 項目 | 需求 |
+|------|------|
+| Node.js | 18+ |
+| Drasl Server | 已部署並開啟 API v2 |
+
+## 安裝
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/Hack-the-SDGs/drash.git
+cd drash
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 快速開始
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# 開發模式
+npm run dev
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# 建置
+npm run build
 
-## Learn More
+# 啟動
+npm start
+```
 
-To learn more about Next.js, take a look at the following resources:
+開啟 [http://localhost:3000](http://localhost:3000) 即可使用。
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 專案結構
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+drash/
+├── app/
+│   ├── layout.tsx            # 根 layout（字型、metadata、Toaster）
+│   ├── page.tsx              # 根路由重導
+│   └── [lang]/               # 語系路由
+│       ├── login/            # 登入頁面
+│       ├── (user)/           # 使用者路由（需登入）
+│       │   ├── profile/      # 個人設定
+│       │   └── players/      # 角色管理
+│       └── (admin)/          # 管理員路由（需 admin/root）
+│           └── admin/
+│               ├── users/    # 使用者管理
+│               ├── players/  # 角色探索
+│               ├── invites/  # 邀請碼管理
+│               └── admins/   # 管理員管理（root）
+│
+├── components/               # React 元件
+│   ├── ui/                   # shadcn/ui 基礎元件
+│   ├── skin-viewer.tsx       # 3D 皮膚預覽
+│   ├── skin-editor.tsx       # 皮膚上傳編輯
+│   ├── player-table.tsx      # 角色列表
+│   ├── user-table.tsx        # 使用者列表
+│   ├── sidebar-nav.tsx       # 側邊導覽
+│   └── ...
+│
+├── lib/
+│   ├── drasl/                # Drasl API 客戶端
+│   │   ├── client.ts         # HTTP 客戶端（含認證）
+│   │   ├── auth.ts           # 驗證端點
+│   │   ├── users.ts          # 使用者 API
+│   │   ├── players.ts        # 角色 API
+│   │   └── textures.ts       # 材質管理
+│   ├── actions/              # Server Actions
+│   │   ├── auth.ts           # 登入登出
+│   │   ├── users.ts          # 使用者操作
+│   │   └── players.ts        # 角色操作
+│   ├── types.ts              # TypeScript 型別定義
+│   └── dictionaries.ts       # i18n 字典管理
+│
+├── messages/                 # 語系檔案
+│   ├── en.json               # English
+│   └── zh-TW.json            # 繁體中文
+│
+└── proxy.ts                  # 中介層（語系偵測、認證檢查）
+```
 
-## Deploy on Vercel
+## 開發
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+# 開發伺服器
+npm run dev
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Lint 檢查
+npm run lint
+
+# 建置
+npm run build
+```
+
+## 貢獻
+
+歡迎 PR 與 Issue！
+
+送出前請確認：
+1. 遵循現有的程式碼風格與架構慣例
+2. 通過 `npm run lint` 與 `npm run build`
+3. 以 `feature/your-feature` 或 `fix/your-fix` 命名分支
