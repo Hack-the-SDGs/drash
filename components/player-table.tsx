@@ -109,7 +109,7 @@ export function PlayerTable({ players, userMap, userRoleMap, users, lang, viewer
   }
 
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4${selected.size > 0 ? " select-none" : ""}`}>
       <div className="flex items-center gap-3">
         <div className="relative max-w-sm flex-1">
           <SearchIcon className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />

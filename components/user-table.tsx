@@ -194,7 +194,7 @@ export function UserTable({ users, lang, currentUserUuid, viewerRole, userRoles 
   }
 
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4${selected.size > 0 ? " select-none" : ""}`}>
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Input
