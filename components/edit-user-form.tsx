@@ -61,8 +61,9 @@ export function EditUserForm({ user, lang, viewerRole, viewerUsername, targetRol
   const dict = useDict();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const isSelf = viewerUsername === user.username;
   const isRoot = viewerRole === "root";
-  const canLock = canLockUser(viewerRole, targetRole, false);
+  const canLock = canLockUser(viewerRole, targetRole, isSelf);
 
   // Dialog states
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -128,8 +129,6 @@ export function EditUserForm({ user, lang, viewerRole, viewerUsername, targetRol
       }
     });
   }
-
-  const isSelf = viewerUsername === user.username;
 
   // -- Token resets --
   function handleResetApiToken() {
