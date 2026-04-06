@@ -265,11 +265,6 @@ export function UserTable({ users, lang, currentUserUuid, viewerRole, userRoles 
                                 {dict.users.lock}
                               </>
                             )}
-                            {!canLock && (
-                              <span className="ml-auto text-xs text-muted-foreground">
-                                {isSelf ? dict.users.cannotLockSelf : dict.users.cannotLockHigherRole}
-                              </span>
-                            )}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
@@ -280,11 +275,6 @@ export function UserTable({ users, lang, currentUserUuid, viewerRole, userRoles 
                           >
                             <Trash2Icon className="size-4" />
                             {dict.users.deleteUser}
-                            {!canLock && (
-                              <span className="ml-auto text-xs text-muted-foreground">
-                                {isSelf ? dict.users.cannotDeleteSelf : dict.users.cannotLockHigherRole}
-                              </span>
-                            )}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
