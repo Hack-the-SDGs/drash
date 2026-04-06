@@ -66,9 +66,17 @@ export function SkinEditor({ player, dict, commonDict, lang, readonly }: SkinEdi
   const [skinUrlInput, setSkinUrlInput] = useState("");
   const [capeUrlInput, setCapeUrlInput] = useState("");
 
+  // Track server-side deletions so the preview clears immediately
+  const [skinCleared, setSkinCleared] = useState(false);
+  const [capeCleared, setCapeCleared] = useState(false);
+
   // File refs
   const skinFileRef = useRef<HTMLInputElement>(null);
   const capeFileRef = useRef<HTMLInputElement>(null);
+
+  // Track whether current submission is a delete
+  const skinDeletePending = useRef(false);
+  const capeDeletePending = useRef(false);
 
   // Bound action with player UUID
   const boundUpdateAction = async (_prev: ActionState, formData: FormData) => {
@@ -89,10 +97,13 @@ export function SkinEditor({ player, dict, commonDict, lang, readonly }: SkinEdi
   useEffect(() => {
     if (skinState?.success) {
       toast.success(dict.saved);
+      if (skinDeletePending.current) setSkinCleared(true);
+      skinDeletePending.current = false;
       setLocalSkinUrl(null);
       setSkinUrlInput("");
       if (skinFileRef.current) skinFileRef.current.value = "";
     } else if (skinState?.error) {
+      skinDeletePending.current = false;
       toast.error(skinState.error);
     }
   }, [skinState, dict.saved]);
@@ -100,10 +111,13 @@ export function SkinEditor({ player, dict, commonDict, lang, readonly }: SkinEdi
   useEffect(() => {
     if (capeState?.success) {
       toast.success(dict.saved);
+      if (capeDeletePending.current) setCapeCleared(true);
+      capeDeletePending.current = false;
       setLocalCapeUrl(null);
       setCapeUrlInput("");
       if (capeFileRef.current) capeFileRef.current.value = "";
     } else if (capeState?.error) {
+      capeDeletePending.current = false;
       toast.error(capeState.error);
     }
   }, [capeState, dict.saved]);
@@ -124,6 +138,7 @@ export function SkinEditor({ player, dict, commonDict, lang, readonly }: SkinEdi
     const url = URL.createObjectURL(file);
     setLocalSkinUrl(url);
     setSkinUrlInput("");
+    setSkinCleared(false);
   };
 
   const handleCapeFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -133,11 +148,12 @@ export function SkinEditor({ player, dict, commonDict, lang, readonly }: SkinEdi
     const url = URL.createObjectURL(file);
     setLocalCapeUrl(url);
     setCapeUrlInput("");
+    setCapeCleared(false);
   };
 
   // Determine what to show in the 3D preview
-  const displaySkinUrl = localSkinUrl || (skinUrlInput ? skinUrlInput : player.skinUrl) || undefined;
-  const displayCapeUrl = localCapeUrl || (capeUrlInput ? capeUrlInput : player.capeUrl) || undefined;
+  const displaySkinUrl = skinCleared ? undefined : (localSkinUrl || (skinUrlInput ? skinUrlInput : player.skinUrl) || undefined);
+  const displayCapeUrl = capeCleared ? undefined : (localCapeUrl || (capeUrlInput ? capeUrlInput : player.capeUrl) || undefined);
 
   return (
     <div className="space-y-6">
@@ -240,6 +256,7 @@ export function SkinEditor({ player, dict, commonDict, lang, readonly }: SkinEdi
                         value={skinUrlInput}
                         onChange={(e) => {
                           setSkinUrlInput(e.target.value);
+                          setSkinCleared(false);
                           if (e.target.value) {
                             setLocalSkinUrl(null);
                             if (skinFileRef.current) skinFileRef.current.value = "";
@@ -259,7 +276,7 @@ export function SkinEditor({ player, dict, commonDict, lang, readonly }: SkinEdi
                         variant="destructive"
                         disabled={skinPending}
                         onClick={() => {
-                          // Inject deleteSkin hidden field before submit
+                          skinDeletePending.current = true;
                           const form = skinFileRef.current?.closest("form");
                           if (form) {
                             const hidden = document.createElement("input");
@@ -314,6 +331,7 @@ export function SkinEditor({ player, dict, commonDict, lang, readonly }: SkinEdi
                         value={capeUrlInput}
                         onChange={(e) => {
                           setCapeUrlInput(e.target.value);
+                          setCapeCleared(false);
                           if (e.target.value) {
                             setLocalCapeUrl(null);
                             if (capeFileRef.current) capeFileRef.current.value = "";
@@ -333,6 +351,7 @@ export function SkinEditor({ player, dict, commonDict, lang, readonly }: SkinEdi
                         variant="destructive"
                         disabled={capePending}
                         onClick={() => {
+                          capeDeletePending.current = true;
                           const form = capeFileRef.current?.closest("form");
                           if (form) {
                             const hidden = document.createElement("input");
