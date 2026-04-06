@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ShieldCheckIcon, ShieldOffIcon } from "lucide-react";
+import { ShieldCheckIcon, ShieldOffIcon, UserIcon } from "lucide-react";
 import type { APIUser } from "@/lib/types";
 
 interface AdminManagerProps {
@@ -49,63 +49,93 @@ export function AdminManager({ users, currentUserUuid }: AdminManagerProps) {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">{dict.admins.title}</h1>
+      <div className="flex items-center gap-3">
+        <Badge variant="secondary" className="whitespace-nowrap">
+          {dict.common.total.replace("{count}", String(users.length))}
+        </Badge>
+      </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{dict.users.username}</TableHead>
-            <TableHead>{dict.profile.role}</TableHead>
-            <TableHead>{dict.common.actions}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {users.map((user) => {
-            const isSelf = user.uuid === currentUserUuid;
+      <div className="rounded-lg border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{dict.users.username}</TableHead>
+              <TableHead>{dict.profile.role}</TableHead>
+              <TableHead>{dict.common.actions}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {users.map((user) => {
+              const isSelf = user.uuid === currentUserUuid;
 
-            return (
-              <TableRow key={user.uuid}>
-                <TableCell className="font-medium">{user.username}</TableCell>
-                <TableCell>
-                  {user.isAdmin ? (
-                    <Badge variant="default">Admin</Badge>
-                  ) : (
-                    <Badge variant="secondary">User</Badge>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {user.isAdmin ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={isSelf || isPending}
-                      title={isSelf ? dict.admins.cannotDemoteSelf : undefined}
-                      onClick={() =>
-                        setPendingAction({ user, promote: false })
-                      }
-                    >
-                      <ShieldOffIcon className="size-4" />
-                      {dict.admins.demote}
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={isPending}
-                      onClick={() =>
-                        setPendingAction({ user, promote: true })
-                      }
-                    >
-                      <ShieldCheckIcon className="size-4" />
-                      {dict.admins.promote}
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+              return (
+                <TableRow
+                  key={user.uuid}
+                  className={isSelf ? "bg-primary/5" : undefined}
+                >
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{user.username}</span>
+                      {isSelf && (
+                        <span className="text-xs text-muted-foreground">
+                          {dict.users.selfIndicator}
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {user.isAdmin ? (
+                      <Badge variant="default" className="bg-blue-600 hover:bg-blue-600">
+                        <ShieldCheckIcon className="size-3" />
+                        Admin
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary">
+                        <UserIcon className="size-3" />
+                        User
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {user.isAdmin ? (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={isSelf || isPending}
+                          onClick={() =>
+                            setPendingAction({ user, promote: false })
+                          }
+                        >
+                          <ShieldOffIcon className="size-4" />
+                          {dict.admins.demote}
+                        </Button>
+                        {isSelf && (
+                          <span className="text-xs text-muted-foreground">
+                            {dict.admins.cannotDemoteSelf}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={isPending}
+                        onClick={() =>
+                          setPendingAction({ user, promote: true })
+                        }
+                      >
+                        <ShieldCheckIcon className="size-4" />
+                        {dict.admins.promote}
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
 
       <ConfirmDialog
         open={pendingAction !== null}

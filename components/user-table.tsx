@@ -36,14 +36,16 @@ import {
   LockOpenIcon,
   Trash2Icon,
   PlusIcon,
+  ShieldCheckIcon,
 } from "lucide-react";
 
 interface UserTableProps {
   users: APIUser[];
   lang: string;
+  currentUserUuid: string;
 }
 
-export function UserTable({ users, lang }: UserTableProps) {
+export function UserTable({ users, lang, currentUserUuid }: UserTableProps) {
   const dict = useDict();
   const [search, setSearch] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -84,12 +86,17 @@ export function UserTable({ users, lang }: UserTableProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
-        <Input
-          placeholder={dict.common.search + "..."}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-sm"
-        />
+        <div className="flex items-center gap-3">
+          <Input
+            placeholder={dict.common.search + "..."}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="max-w-sm"
+          />
+          <Badge variant="secondary" className="whitespace-nowrap">
+            {dict.common.total.replace("{count}", String(filtered.length))}
+          </Badge>
+        </div>
         <Button
           size="sm"
           nativeButton={false}
@@ -119,72 +126,120 @@ export function UserTable({ users, lang }: UserTableProps) {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((user) => (
-                <TableRow key={user.uuid}>
-                  <TableCell className="font-medium">{user.username}</TableCell>
-                  <TableCell>
-                    {user.isAdmin ? (
-                      <Badge variant="default">{dict.users.isAdmin}</Badge>
-                    ) : (
-                      <Badge variant="secondary">{dict.common.no}</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {user.isLocked ? (
-                      <Badge variant="destructive">{dict.users.isLocked}</Badge>
-                    ) : (
-                      <Badge variant="secondary">{dict.common.no}</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>{user.players?.length ?? 0}</TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={
-                          <Button variant="ghost" size="icon-sm" />
-                        }
-                      >
-                        <MoreHorizontalIcon className="size-4" />
-                        <span className="sr-only">{dict.common.actions}</span>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
+              filtered.map((user) => {
+                const isSelf = user.uuid === currentUserUuid;
+                const playerNames = user.players?.map((p) => p.name) ?? [];
+
+                return (
+                  <TableRow
+                    key={user.uuid}
+                    className={isSelf ? "bg-primary/5" : undefined}
+                  >
+                    <TableCell>
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/${lang}/admin/users/${user.uuid}`}
+                            className="font-medium hover:underline"
+                          >
+                            {user.username}
+                          </Link>
+                          {isSelf && (
+                            <span className="text-xs text-muted-foreground">
+                              {dict.users.selfIndicator}
+                            </span>
+                          )}
+                        </div>
+                        {playerNames.length > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            {playerNames.join(", ")}
+                          </p>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {user.isAdmin ? (
+                        <Badge variant="default" className="bg-blue-600 hover:bg-blue-600">
+                          <ShieldCheckIcon className="size-3" />
+                          {dict.users.isAdmin}
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary">{dict.common.no}</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {user.isLocked ? (
+                        <Badge variant="destructive">
+                          <LockIcon className="size-3" />
+                          {dict.users.isLocked}
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary">{dict.common.no}</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>{user.players?.length ?? 0}</TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
                           render={
-                            <Link href={`/${lang}/admin/users/${user.uuid}`} />
+                            <Button variant="ghost" size="icon-sm" />
                           }
                         >
-                          <PencilIcon className="size-4" />
-                          {dict.common.edit}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleLockToggle(user)}
-                          disabled={isPending}
-                        >
-                          {user.isLocked ? (
-                            <>
-                              <LockOpenIcon className="size-4" />
-                              {dict.users.unlock}
-                            </>
-                          ) : (
-                            <>
-                              <LockIcon className="size-4" />
-                              {dict.users.lock}
-                            </>
-                          )}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          variant="destructive"
-                          onClick={() => setDeleteTarget(user)}
-                        >
-                          <Trash2Icon className="size-4" />
-                          {dict.users.deleteUser}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
+                          <MoreHorizontalIcon className="size-4" />
+                          <span className="sr-only">{dict.common.actions}</span>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            render={
+                              <Link href={`/${lang}/admin/users/${user.uuid}`} />
+                            }
+                          >
+                            <PencilIcon className="size-4" />
+                            {dict.common.edit}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleLockToggle(user)}
+                            disabled={isPending || isSelf}
+                            title={isSelf ? dict.users.cannotLockSelf : undefined}
+                          >
+                            {user.isLocked ? (
+                              <>
+                                <LockOpenIcon className="size-4" />
+                                {dict.users.unlock}
+                              </>
+                            ) : (
+                              <>
+                                <LockIcon className="size-4" />
+                                {dict.users.lock}
+                              </>
+                            )}
+                            {isSelf && (
+                              <span className="ml-auto text-xs text-muted-foreground">
+                                {dict.users.cannotLockSelf}
+                              </span>
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => setDeleteTarget(user)}
+                            disabled={isSelf}
+                            title={isSelf ? dict.users.cannotDeleteSelf : undefined}
+                          >
+                            <Trash2Icon className="size-4" />
+                            {dict.users.deleteUser}
+                            {isSelf && (
+                              <span className="ml-auto text-xs text-muted-foreground">
+                                {dict.users.cannotDeleteSelf}
+                              </span>
+                            )}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>

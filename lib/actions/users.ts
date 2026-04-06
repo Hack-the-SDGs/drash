@@ -127,6 +127,12 @@ export async function updateUserAction(uuid: string, formData: FormData) {
 }
 
 export async function deleteUserAction(uuid: string) {
+  const { getSession } = await import("@/lib/drasl/auth");
+  const session = await getSession();
+  if (session?.uuid === uuid) {
+    return { success: false, error: "Cannot delete your own account" };
+  }
+
   try {
     await deleteUser(uuid);
     updateTag("users");
@@ -140,6 +146,13 @@ export async function deleteUserAction(uuid: string) {
 }
 
 export async function lockUserAction(uuid: string) {
+  // Prevent locking yourself
+  const { getSession } = await import("@/lib/drasl/auth");
+  const session = await getSession();
+  if (session?.uuid === uuid) {
+    return { success: false, error: "Cannot lock your own account" };
+  }
+
   try {
     await updateUser(uuid, { isLocked: true });
     updateTag("users");

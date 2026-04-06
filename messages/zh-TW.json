@@ -15,8 +15,15 @@
     "logout": "登出",
     "language": "語言",
     "copiedToClipboard": "已複製到剪貼簿",
+    "copied": "已複製！",
     "yes": "是",
-    "no": "否"
+    "no": "否",
+    "total": "共 {count} 筆",
+    "goToAdmin": "前往管理面板",
+    "daysAgo": "{count} 天前",
+    "hoursAgo": "{count} 小時前",
+    "minutesAgo": "{count} 分鐘前",
+    "justNow": "剛剛"
   },
   "auth": {
     "login": "登入",
@@ -31,15 +38,22 @@
     "users": "使用者",
     "players": "玩家",
     "invites": "邀請碼",
-    "admins": "管理員"
+    "admins": "管理員",
+    "dashboard": "儀表板",
+    "adminPanel": "管理面板"
   },
   "profile": {
     "title": "我的資料",
+    "description": "查看你的帳號資訊與玩家",
     "username": "帳號",
     "uuid": "UUID",
     "role": "角色",
+    "isAdmin": "管理員",
+    "isLocked": "已鎖定",
     "myPlayers": "我的玩家",
-    "editSkin": "編輯外觀"
+    "editSkin": "編輯外觀",
+    "createdAt": "建立時間",
+    "skinModel": "模型"
   },
   "player": {
     "title": "編輯玩家",
@@ -65,10 +79,12 @@
     "capeSaved": "披風更新成功",
     "saved": "玩家更新成功",
     "deleted": "玩家已刪除",
-    "owner": "所屬使用者"
+    "owner": "所屬使用者",
+    "description": "管理所有玩家資料"
   },
   "users": {
     "title": "使用者管理",
+    "description": "管理所有已註冊的使用者",
     "createUser": "建立使用者",
     "editUser": "編輯使用者",
     "username": "帳號",
@@ -101,10 +117,14 @@
     "existingPlayer": "現有玩家",
     "chosenUuid": "自訂 UUID",
     "fallbackPlayer": "備用玩家",
-    "requestApiToken": "請求 API Token"
+    "requestApiToken": "請求 API Token",
+    "selfIndicator": "（你自己）",
+    "cannotLockSelf": "無法鎖定自己的帳號",
+    "cannotDeleteSelf": "無法刪除自己的帳號"
   },
   "invites": {
     "title": "邀請碼管理",
+    "description": "管理註冊邀請碼",
     "createInvite": "建立邀請碼",
     "code": "邀請碼",
     "createdAt": "建立時間",
@@ -117,6 +137,7 @@
   },
   "admins": {
     "title": "管理員管理",
+    "description": "管理管理員權限",
     "promote": "升為管理員",
     "demote": "移除管理員",
     "promoteConfirm": "確定將此使用者升為管理員？",

@@ -15,8 +15,15 @@
     "logout": "Logout",
     "language": "Language",
     "copiedToClipboard": "Copied to clipboard",
+    "copied": "Copied!",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "total": "{count} total",
+    "goToAdmin": "Go to Admin Panel",
+    "daysAgo": "{count} days ago",
+    "hoursAgo": "{count} hours ago",
+    "minutesAgo": "{count} minutes ago",
+    "justNow": "Just now"
   },
   "auth": {
     "login": "Login",
@@ -31,15 +38,22 @@
     "users": "Users",
     "players": "Players",
     "invites": "Invites",
-    "admins": "Admins"
+    "admins": "Admins",
+    "dashboard": "Dashboard",
+    "adminPanel": "Admin Panel"
   },
   "profile": {
     "title": "My Profile",
+    "description": "View your account info and players",
     "username": "Username",
     "uuid": "UUID",
     "role": "Role",
+    "isAdmin": "Admin",
+    "isLocked": "Locked",
     "myPlayers": "My Players",
-    "editSkin": "Edit Skin"
+    "editSkin": "Edit Skin",
+    "createdAt": "Created",
+    "skinModel": "Model"
   },
   "player": {
     "title": "Edit Player",
@@ -65,10 +79,12 @@
     "capeSaved": "Cape updated successfully",
     "saved": "Player updated successfully",
     "deleted": "Player deleted",
-    "owner": "Owner"
+    "owner": "Owner",
+    "description": "Manage all player profiles"
   },
   "users": {
     "title": "Users",
+    "description": "Manage all registered users",
     "createUser": "Create User",
     "editUser": "Edit User",
     "username": "Username",
@@ -101,10 +117,14 @@
     "existingPlayer": "Existing Player",
     "chosenUuid": "Custom UUID",
     "fallbackPlayer": "Fallback Player",
-    "requestApiToken": "Request API Token"
+    "requestApiToken": "Request API Token",
+    "selfIndicator": "(you)",
+    "cannotLockSelf": "Cannot lock your own account",
+    "cannotDeleteSelf": "Cannot delete your own account"
   },
   "invites": {
     "title": "Invites",
+    "description": "Manage invite codes for registration",
     "createInvite": "Create Invite",
     "code": "Code",
     "createdAt": "Created At",
@@ -117,6 +137,7 @@
   },
   "admins": {
     "title": "Admin Management",
+    "description": "Promote or demote admin privileges",
     "promote": "Promote to Admin",
     "demote": "Remove Admin",
     "promoteConfirm": "Promote this user to admin?",

@@ -55,86 +55,107 @@ export function PlayerTable({ players, userMap, lang }: PlayerTableProps) {
 
   return (
     <div className="space-y-4">
-      <div className="relative max-w-sm">
-        <SearchIcon className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder={dict.common.search}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-8"
-        />
+      <div className="flex items-center gap-3">
+        <div className="relative max-w-sm flex-1">
+          <SearchIcon className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder={dict.common.search}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8"
+          />
+        </div>
+        <Badge variant="secondary" className="whitespace-nowrap">
+          {dict.common.total.replace("{count}", String(filtered.length))}
+        </Badge>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{dict.player.name}</TableHead>
-            <TableHead>{dict.player.uuid}</TableHead>
-            <TableHead>{dict.player.owner}</TableHead>
-            <TableHead>{dict.player.skin}</TableHead>
-            <TableHead>{dict.player.skinModel}</TableHead>
-            <TableHead>{dict.common.actions}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filtered.length === 0 ? (
+      <div className="rounded-lg border">
+        <Table>
+          <TableHeader>
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground">
-                {dict.common.noData}
-              </TableCell>
+              <TableHead>{dict.player.name}</TableHead>
+              <TableHead>{dict.player.uuid}</TableHead>
+              <TableHead>{dict.player.owner}</TableHead>
+              <TableHead>{dict.player.skinModel}</TableHead>
+              <TableHead>{dict.common.actions}</TableHead>
             </TableRow>
-          ) : (
-            filtered.map((player) => (
-              <TableRow key={player.uuid}>
-                <TableCell className="font-medium">{player.name}</TableCell>
-                <TableCell className="font-mono text-xs">
-                  {player.uuid}
-                </TableCell>
-                <TableCell>
-                  {userMap[player.userUuid] ?? player.userUuid}
-                </TableCell>
-                <TableCell>
-                  {player.skinUrl ? (
-                    <Image
-                      src={player.skinUrl}
-                      alt={player.name}
-                      width={32}
-                      height={32}
-                      className="rounded"
-                      unoptimized
-                    />
-                  ) : (
-                    <span className="text-muted-foreground">-</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Badge variant="secondary">{player.skinModel === "slim" ? dict.player.slim : dict.player.classic}</Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      nativeButton={false}
-                      render={<Link href={`/${lang}/admin/players/${player.uuid}`} />}
-                    >
-                      <PencilIcon className="size-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => setDeleteTarget(player)}
-                      disabled={isPending}
-                    >
-                      <Trash2Icon className="size-4 text-destructive" />
-                    </Button>
-                  </div>
+          </TableHeader>
+          <TableBody>
+            {filtered.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  {dict.common.noData}
                 </TableCell>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+            ) : (
+              filtered.map((player) => (
+                <TableRow key={player.uuid}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded bg-muted">
+                        {player.skinUrl ? (
+                          <Image
+                            src={player.skinUrl}
+                            alt={player.name}
+                            width={32}
+                            height={32}
+                            className="size-full object-contain"
+                            style={{ imageRendering: "pixelated" }}
+                            unoptimized
+                          />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </div>
+                      <Link
+                        href={`/${lang}/admin/players/${player.uuid}`}
+                        className="font-medium hover:underline"
+                      >
+                        {player.name}
+                      </Link>
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">
+                    {player.uuid}
+                  </TableCell>
+                  <TableCell>
+                    <Link
+                      href={`/${lang}/admin/users/${player.userUuid}`}
+                      className="hover:underline"
+                    >
+                      {userMap[player.userUuid] ?? player.userUuid}
+                    </Link>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">{player.skinModel === "slim" ? dict.player.slim : dict.player.classic}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        nativeButton={false}
+                        render={<Link href={`/${lang}/admin/players/${player.uuid}`} />}
+                      >
+                        <PencilIcon className="size-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => setDeleteTarget(player)}
+                        disabled={isPending}
+                      >
+                        <Trash2Icon className="size-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
       <ConfirmDialog
         open={deleteTarget !== null}

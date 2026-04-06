@@ -17,5 +17,15 @@ export default async function AdminsPage(
   const dict = await getDictionary(lang as Locale);
   const users = await getUsers();
 
-  return <AdminManager users={users} currentUserUuid={session.uuid} />;
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">{dict.admins.title}</h1>
+          <p className="text-muted-foreground">{dict.admins.description}</p>
+        </div>
+      </div>
+      <AdminManager users={users} currentUserUuid={session.uuid} />
+    </div>
+  );
 }

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/drasl/auth";
 import { getDictionary, type Locale } from "@/lib/dictionaries";
@@ -5,9 +6,16 @@ import { logoutAction } from "@/lib/actions/auth";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { AdminMobileSidebar } from "./admin-mobile-sidebar";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { SidebarNav, type NavItem } from "@/components/sidebar-nav";
-import { LogOutIcon } from "lucide-react";
+import {
+  LogOutIcon,
+  Users,
+  Gamepad2,
+  TicketPlus,
+  ShieldCheck,
+} from "lucide-react";
 
 export default async function AdminLayout(
   props: LayoutProps<"/[lang]">,
@@ -23,26 +31,50 @@ export default async function AdminLayout(
   const dict = await getDictionary(lang as Locale);
 
   const navItems: NavItem[] = [
-    { label: dict.nav.users, href: `/${lang}/admin/users` },
-    { label: dict.nav.players, href: `/${lang}/admin/players` },
-    { label: dict.nav.invites, href: `/${lang}/admin/invites` },
+    {
+      label: dict.nav.users,
+      href: `/${lang}/admin/users`,
+      icon: <Users />,
+    },
+    {
+      label: dict.nav.players,
+      href: `/${lang}/admin/players`,
+      icon: <Gamepad2 />,
+    },
+    {
+      label: dict.nav.invites,
+      href: `/${lang}/admin/invites`,
+      icon: <TicketPlus />,
+    },
   ];
 
   const rootNavItems: NavItem[] =
     session.role === "root"
-      ? [{ label: dict.nav.admins, href: `/${lang}/admin/admins` }]
+      ? [
+          {
+            label: dict.nav.admins,
+            href: `/${lang}/admin/admins`,
+            icon: <ShieldCheck />,
+          },
+        ]
       : [];
 
   return (
     <div className="flex min-h-screen">
       {/* Desktop sidebar */}
-      <aside className="hidden w-60 shrink-0 border-r bg-background md:block">
-        <div className="flex h-14 items-center px-4">
-          <span className="text-lg font-semibold tracking-tight">
+      <aside className="hidden w-60 shrink-0 flex-col border-r bg-muted/40 md:flex">
+        {/* App name / brand */}
+        <div className="flex h-14 items-center border-b px-4">
+          <Link
+            href={`/${lang}/admin/users`}
+            className="text-lg font-semibold tracking-tight hover:opacity-80"
+          >
             {dict.common.appName}
-          </span>
+          </Link>
         </div>
-        <div className="px-3 py-2">
+
+        {/* Navigation */}
+        <div className="flex-1 px-3 py-4">
           <SidebarNav items={navItems} />
           {rootNavItems.length > 0 && (
             <>
@@ -50,6 +82,23 @@ export default async function AdminLayout(
               <SidebarNav items={rootNavItems} />
             </>
           )}
+        </div>
+
+        {/* User info at bottom */}
+        <div className="border-t px-4 py-3">
+          <div className="flex items-center gap-2">
+            <div className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
+              {session.username.charAt(0).toUpperCase()}
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-medium leading-tight">
+                {session.username}
+              </span>
+              <Badge variant="secondary" className="mt-0.5 w-fit text-[10px]">
+                {session.role}
+              </Badge>
+            </div>
+          </div>
         </div>
       </aside>
 
@@ -63,6 +112,8 @@ export default async function AdminLayout(
               appName={dict.common.appName}
               navItems={navItems}
               rootNavItems={rootNavItems}
+              username={session.username}
+              role={session.role}
             />
 
             <div className="flex-1" />
@@ -72,6 +123,9 @@ export default async function AdminLayout(
             <span className="hidden text-sm text-muted-foreground sm:inline">
               {session.username}
             </span>
+            <Badge variant="outline" className="hidden sm:inline-flex">
+              {session.role}
+            </Badge>
 
             <form action={logoutAction}>
               <Button variant="ghost" size="sm" type="submit">

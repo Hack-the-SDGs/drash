@@ -12,7 +12,24 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PencilIcon, UserIcon } from "lucide-react";
+import {
+  PencilIcon,
+  UserIcon,
+  ShieldCheckIcon,
+  LockIcon,
+  SettingsIcon,
+} from "lucide-react";
+
+function formatRelativeTime(dateStr: string, lang: string): string {
+  if (!dateStr) return "-";
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString(lang === "zh-TW" ? "zh-TW" : "en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
 
 export default async function ProfilePage(
   props: { params: Promise<{ lang: string }> },
@@ -40,9 +57,27 @@ export default async function ProfilePage(
       ? "default"
       : "secondary";
 
+  const isAdmin = role === "admin" || role === "root";
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">{dict.profile.title}</h1>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">{dict.profile.title}</h1>
+          <p className="text-muted-foreground">{dict.profile.description}</p>
+        </div>
+        {isAdmin && (
+          <Button
+            size="sm"
+            variant="outline"
+            nativeButton={false}
+            render={<Link href={`/${lang}/admin/users`} />}
+          >
+            <SettingsIcon className="size-4" data-icon="inline-start" />
+            {dict.common.goToAdmin}
+          </Button>
+        )}
+      </div>
 
       {/* User info card */}
       <Card>
@@ -60,7 +95,7 @@ export default async function ProfilePage(
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <p className="text-xs text-muted-foreground">
                 {dict.profile.username}
@@ -79,13 +114,42 @@ export default async function ProfilePage(
               </p>
               <Badge variant={roleBadgeVariant}>{role}</Badge>
             </div>
+            <div className="flex flex-wrap gap-2">
+              {user.isAdmin && (
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    {dict.profile.isAdmin}
+                  </p>
+                  <Badge variant="default" className="bg-blue-600 hover:bg-blue-600">
+                    <ShieldCheckIcon className="size-3" />
+                    {dict.profile.isAdmin}
+                  </Badge>
+                </div>
+              )}
+              {user.isLocked && (
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    {dict.profile.isLocked}
+                  </p>
+                  <Badge variant="destructive">
+                    <LockIcon className="size-3" />
+                    {dict.profile.isLocked}
+                  </Badge>
+                </div>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* My Players section */}
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold">{dict.profile.myPlayers}</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold">{dict.profile.myPlayers}</h2>
+          <Badge variant="secondary">
+            {dict.common.total.replace("{count}", String(user.players.length))}
+          </Badge>
+        </div>
 
         {user.players.length === 0 ? (
           <Card>
@@ -98,8 +162,8 @@ export default async function ProfilePage(
             {user.players.map((player) => (
               <Card key={player.uuid}>
                 <CardContent className="flex items-start gap-4 p-4">
-                  {/* Skin thumbnail */}
-                  <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
+                  {/* Skin thumbnail - bigger */}
+                  <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
                     {player.skinUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -114,16 +178,23 @@ export default async function ProfilePage(
                   </div>
 
                   {/* Player info */}
-                  <div className="flex-1 space-y-1 overflow-hidden">
+                  <div className="flex-1 space-y-1.5 overflow-hidden">
                     <p className="truncate text-sm font-medium">
                       {player.name}
                     </p>
                     <p className="truncate font-mono text-xs text-muted-foreground">
                       {player.uuid}
                     </p>
-                    <Badge variant="outline" className="text-xs">
-                      {player.skinModel}
-                    </Badge>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Badge variant="outline" className="text-xs">
+                        {dict.profile.skinModel}: {player.skinModel === "slim" ? dict.player.slim : dict.player.classic}
+                      </Badge>
+                    </div>
+                    {player.createdAt && (
+                      <p className="text-xs text-muted-foreground">
+                        {dict.profile.createdAt}: {formatRelativeTime(player.createdAt, lang)}
+                      </p>
+                    )}
                   </div>
 
                   {/* Edit link */}

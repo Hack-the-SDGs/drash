@@ -17,8 +17,13 @@ export default async function PlayersPage(
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold">{dict.nav.players}</h1>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">{dict.nav.players}</h1>
+          <p className="text-muted-foreground">{dict.player.description}</p>
+        </div>
+      </div>
       <PlayerTable players={players} userMap={userMap} lang={lang} />
     </div>
   );

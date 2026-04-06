@@ -1,10 +1,12 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/drasl/auth";
 import { getDictionary, type Locale } from "@/lib/dictionaries";
 import { logoutAction } from "@/lib/actions/auth";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
-import { LogOutIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { LogOutIcon, ShieldIcon } from "lucide-react";
 
 export default async function UserLayout(
   props: LayoutProps<"/[lang]">,
@@ -16,13 +18,33 @@ export default async function UserLayout(
 
   const dict = await getDictionary(lang as Locale);
 
+  const isAdmin = session.role === "admin" || session.role === "root";
+
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
+      <header className="sticky top-0 z-40 border-b bg-muted/40 backdrop-blur supports-backdrop-filter:bg-muted/20">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <span className="text-lg font-semibold tracking-tight">
-            {dict.common.appName}
-          </span>
+          <div className="flex items-center gap-4">
+            <Link
+              href={`/${lang}/profile`}
+              className="text-lg font-semibold tracking-tight hover:opacity-80"
+            >
+              {dict.common.appName}
+            </Link>
+
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                render={<Link href={`/${lang}/admin/users`} />}
+              >
+                <ShieldIcon className="size-4" />
+                <span className="hidden sm:inline">
+                  {dict.nav.adminPanel}
+                </span>
+              </Button>
+            )}
+          </div>
 
           <div className="flex items-center gap-2">
             <LanguageSwitcher locale={lang as Locale} />
@@ -30,6 +52,9 @@ export default async function UserLayout(
             <span className="hidden text-sm text-muted-foreground sm:inline">
               {session.username}
             </span>
+            <Badge variant="outline" className="hidden sm:inline-flex">
+              {session.role}
+            </Badge>
 
             <form action={logoutAction}>
               <Button variant="ghost" size="sm" type="submit">
