@@ -244,6 +244,7 @@ export function UserTable({ users, lang, currentUserUuid, viewerRole, userRoles 
                             render={
                               <Link href={`/${lang}/admin/users/${user.uuid}`} />
                             }
+                            disabled={!canLock && !isSelf}
                           >
                             <PencilIcon className="size-4" />
                             {dict.common.edit}
