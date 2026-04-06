@@ -95,13 +95,11 @@ export function ProfilePlayers({
                       </div>
                     </div>
                     <div className="flex flex-col gap-1">
-                      {!mojang && (
-                        <Link href={`/${lang}/players/${player.uuid}`}>
-                          <Button variant="ghost" size="icon-sm">
-                            <PencilIcon className="size-4" />
-                          </Button>
-                        </Link>
-                      )}
+                      <Link href={`/${lang}/players/${player.uuid}`}>
+                        <Button variant="ghost" size="icon-sm">
+                          <PencilIcon className="size-4" />
+                        </Button>
+                      </Link>
                       {canManage && (
                         <Button
                           variant="ghost"
