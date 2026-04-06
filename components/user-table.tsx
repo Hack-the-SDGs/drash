@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useCallback } from "react";
 import Link from "next/link";
 import {
   Table,
@@ -25,6 +25,9 @@ import {
   lockUserAction,
   unlockUserAction,
   deleteUserAction,
+  batchLockUsersAction,
+  batchUnlockUsersAction,
+  batchDeleteUsersAction,
 } from "@/lib/actions/users";
 import { useDict } from "@/components/dict-provider";
 import { toast } from "sonner";
@@ -56,6 +59,8 @@ export function UserTable({ users, lang, currentUserUuid, viewerRole, userRoles 
   const [search, setSearch] = useState("");
   const [isPending, startTransition] = useTransition();
   const [deleteTarget, setDeleteTarget] = useState<APIUser | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
 
   const filtered = users.filter((u) =>
     u.username.toLowerCase().includes(search.toLowerCase()),
@@ -77,6 +82,35 @@ export function UserTable({ users, lang, currentUserUuid, viewerRole, userRoles 
       playerCount: (a, b) => (a.players?.length ?? 0) - (b.players?.length ?? 0),
     },
   });
+
+  // Only selectable users: those the viewer can manage (canLock)
+  const selectableUuids = sorted
+    .filter((u) => {
+      const isSelf = u.uuid === currentUserUuid;
+      const targetRole = userRoles[u.uuid] ?? "user";
+      return canLockUser(viewerRole, targetRole, isSelf);
+    })
+    .map((u) => u.uuid);
+
+  const allSelected = selectableUuids.length > 0 && selectableUuids.every((id) => selected.has(id));
+  const someSelected = selectableUuids.some((id) => selected.has(id));
+
+  const toggleAll = useCallback(() => {
+    if (allSelected) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(selectableUuids));
+    }
+  }, [allSelected, selectableUuids]);
+
+  const toggleOne = useCallback((uuid: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(uuid)) next.delete(uuid);
+      else next.add(uuid);
+      return next;
+    });
+  }, []);
 
   function handleLockToggle(user: APIUser) {
     startTransition(async () => {
@@ -103,6 +137,40 @@ export function UserTable({ users, lang, currentUserUuid, viewerRole, userRoles 
         toast.error(result.error);
       }
       setDeleteTarget(null);
+    });
+  }
+
+  function handleBatchLock() {
+    const uuids = [...selected];
+    startTransition(async () => {
+      const results = await batchLockUsersAction(uuids);
+      const success = results.filter((r) => r.success).length;
+      const failed = results.filter((r) => !r.success).length;
+      toast.success(dict.users.batchLocked.replace("{success}", String(success)).replace("{failed}", String(failed)));
+      setSelected(new Set());
+    });
+  }
+
+  function handleBatchUnlock() {
+    const uuids = [...selected];
+    startTransition(async () => {
+      const results = await batchUnlockUsersAction(uuids);
+      const success = results.filter((r) => r.success).length;
+      const failed = results.filter((r) => !r.success).length;
+      toast.success(dict.users.batchUnlocked.replace("{success}", String(success)).replace("{failed}", String(failed)));
+      setSelected(new Set());
+    });
+  }
+
+  function handleBatchDelete() {
+    const uuids = [...selected];
+    startTransition(async () => {
+      const results = await batchDeleteUsersAction(uuids);
+      const success = results.filter((r) => r.success).length;
+      const failed = results.filter((r) => !r.success).length;
+      toast.success(dict.users.batchDeleted.replace("{success}", String(success)).replace("{failed}", String(failed)));
+      setSelected(new Set());
+      setBatchDeleteOpen(false);
     });
   }
 
@@ -136,10 +204,43 @@ export function UserTable({ users, lang, currentUserUuid, viewerRole, userRoles 
         </div>
       </div>
 
+      {selected.size > 0 && (
+        <div className="flex items-center gap-2 rounded-lg border bg-muted/50 px-4 py-2">
+          <span className="text-sm font-medium">
+            {dict.users.selected.replace("{count}", String(selected.size))}
+          </span>
+          <div className="ml-auto flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={handleBatchLock} disabled={isPending}>
+              <LockIcon className="size-3.5" data-icon="inline-start" />
+              {dict.users.batchLock}
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleBatchUnlock} disabled={isPending}>
+              <LockOpenIcon className="size-3.5" data-icon="inline-start" />
+              {dict.users.batchUnlock}
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => setBatchDeleteOpen(true)} disabled={isPending}>
+              <Trash2Icon className="size-3.5" data-icon="inline-start" />
+              {dict.users.batchDelete}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[40px]">
+                <input
+                  type="checkbox"
+                  className="size-4 accent-primary"
+                  checked={allSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someSelected && !allSelected;
+                  }}
+                  onChange={toggleAll}
+                />
+              </TableHead>
               <TableHead>
                 <button className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("username")}>
                   {dict.users.username}
@@ -170,7 +271,7 @@ export function UserTable({ users, lang, currentUserUuid, viewerRole, userRoles 
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                <TableCell colSpan={6} className="text-center text-muted-foreground">
                   {dict.common.noData}
                 </TableCell>
               </TableRow>
@@ -186,6 +287,15 @@ export function UserTable({ users, lang, currentUserUuid, viewerRole, userRoles 
                     key={user.uuid}
                     className={isSelf ? "bg-primary/5" : undefined}
                   >
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        className="size-4 accent-primary"
+                        checked={selected.has(user.uuid)}
+                        disabled={!canLock}
+                        onChange={() => toggleOne(user.uuid)}
+                      />
+                    </TableCell>
                     <TableCell>
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
@@ -298,6 +408,18 @@ export function UserTable({ users, lang, currentUserUuid, viewerRole, userRoles 
         cancelLabel={dict.common.cancel}
         destructive
         onConfirm={handleDelete}
+        pending={isPending}
+      />
+
+      <ConfirmDialog
+        open={batchDeleteOpen}
+        onOpenChange={setBatchDeleteOpen}
+        title={dict.users.batchDelete}
+        description={dict.users.batchDeleteConfirm.replace("{count}", String(selected.size))}
+        confirmLabel={dict.common.delete}
+        cancelLabel={dict.common.cancel}
+        destructive
+        onConfirm={handleBatchDelete}
         pending={isPending}
       />
     </div>
