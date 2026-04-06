@@ -40,6 +40,8 @@ import { toast } from "sonner";
 import type { APIUser, Role } from "@/lib/types";
 import {
   CopyIcon,
+  EyeIcon,
+  EyeOffIcon,
   Trash2Icon,
   PlusIcon,
   KeyIcon,
@@ -160,15 +162,26 @@ export function EditUserForm({ user, lang, viewerRole, viewerUsername, targetRol
   }
 
   function TokenField({ label, value }: { label: string; value: string }) {
+    const [visible, setVisible] = useState(false);
     return (
       <div className="flex flex-col gap-1.5">
         <Label>{label}</Label>
         <div className="flex gap-2">
-          <Input value={value || "-"} disabled className="font-mono text-xs" />
+          <Input
+            value={value ? (visible ? value : "••••••••••••••••") : "-"}
+            disabled
+            className="font-mono text-xs"
+            type="text"
+          />
           {value && (
-            <Button type="button" variant="outline" size="icon" onClick={() => copyToClipboard(value)}>
-              <CopyIcon className="size-4" />
-            </Button>
+            <>
+              <Button type="button" variant="outline" size="icon" onClick={() => setVisible(!visible)}>
+                {visible ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
+              </Button>
+              <Button type="button" variant="outline" size="icon" onClick={() => copyToClipboard(value)}>
+                <CopyIcon className="size-4" />
+              </Button>
+            </>
           )}
         </div>
       </div>
