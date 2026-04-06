@@ -49,6 +49,33 @@ import {
   UnlinkIcon,
 } from "lucide-react";
 
+function TokenField({ label, value, onCopy }: { label: string; value: string; onCopy: (text: string) => void }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label>{label}</Label>
+      <div className="flex gap-2">
+        <Input
+          value={value ? (visible ? value : "••••••••••••••••") : "-"}
+          disabled
+          className="font-mono text-xs"
+          type="text"
+        />
+        {value && (
+          <>
+            <Button type="button" variant="outline" size="icon" onClick={() => setVisible(!visible)}>
+              {visible ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
+            </Button>
+            <Button type="button" variant="outline" size="icon" onClick={() => onCopy(value)}>
+              <CopyIcon className="size-4" />
+            </Button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface EditUserFormProps {
   user: APIUser;
   lang: string;
@@ -158,33 +185,6 @@ export function EditUserForm({ user, lang, viewerRole, viewerUsername, targetRol
       }
       setResetMcOpen(false);
     });
-  }
-
-  function TokenField({ label, value }: { label: string; value: string }) {
-    const [visible, setVisible] = useState(false);
-    return (
-      <div className="flex flex-col gap-1.5">
-        <Label>{label}</Label>
-        <div className="flex gap-2">
-          <Input
-            value={value ? (visible ? value : "••••••••••••••••") : "-"}
-            disabled
-            className="font-mono text-xs"
-            type="text"
-          />
-          {value && (
-            <>
-              <Button type="button" variant="outline" size="icon" onClick={() => setVisible(!visible)}>
-                {visible ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
-              </Button>
-              <Button type="button" variant="outline" size="icon" onClick={() => copyToClipboard(value)}>
-                <CopyIcon className="size-4" />
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-    );
   }
 
   // -- Delete --
@@ -368,8 +368,8 @@ export function EditUserForm({ user, lang, viewerRole, viewerUsername, targetRol
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <TokenField label="API Token" value={user.apiToken} />
-            <TokenField label="Minecraft Token" value={user.minecraftToken} />
+            <TokenField label="API Token" value={user.apiToken} onCopy={copyToClipboard} />
+            <TokenField label="Minecraft Token" value={user.minecraftToken} onCopy={copyToClipboard} />
           </div>
           <div className="flex flex-wrap gap-2">
             <Button
