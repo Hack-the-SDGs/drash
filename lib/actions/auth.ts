@@ -4,9 +4,18 @@ import { redirect } from "next/navigation";
 import { login, logout } from "@/lib/drasl/auth";
 import { DraslAPIError } from "@/lib/drasl/client";
 
-export async function loginAction(formData: FormData) {
+export type LoginState = {
+  success: boolean;
+  error?: string;
+} | null;
+
+export async function loginAction(
+  _prevState: LoginState,
+  formData: FormData,
+): Promise<LoginState> {
   const username = formData.get("username") as string;
   const password = formData.get("password") as string;
+  const lang = (formData.get("lang") as string) || "en";
 
   if (!username || !password) {
     return { success: false, error: "Username and password are required" };
@@ -16,9 +25,9 @@ export async function loginAction(formData: FormData) {
     const user = await login({ username, password });
 
     if (user.role === "root" || user.role === "admin") {
-      redirect("/en/admin/users");
+      redirect(`/${lang}/admin/users`);
     } else {
-      redirect("/en/profile");
+      redirect(`/${lang}/profile`);
     }
   } catch (e) {
     if (e instanceof DraslAPIError) {
