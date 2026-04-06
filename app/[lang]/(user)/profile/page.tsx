@@ -20,6 +20,7 @@ import {
   LockIcon,
   SettingsIcon,
 } from "lucide-react";
+import { PlayerHead } from "@/components/player-head";
 
 function formatRelativeTime(dateStr: string, lang: string): string {
   if (!dateStr) return "-";
@@ -171,20 +172,11 @@ export default async function ProfilePage(
             {playersWithTextures.map((player) => (
               <Card key={player.uuid}>
                 <CardContent className="flex items-start gap-4 p-4">
-                  {/* Skin thumbnail - bigger */}
-                  <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
-                    {player.skinUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={player.skinUrl}
-                        alt={player.name}
-                        className="size-full object-contain"
-                        style={{ imageRendering: "pixelated" }}
-                      />
-                    ) : (
-                      <UserIcon className="size-8 text-muted-foreground" />
-                    )}
-                  </div>
+                  <PlayerHead
+                    skinUrl={player.skinUrl}
+                    size={48}
+                    className="shrink-0"
+                  />
 
                   {/* Player info */}
                   <div className="flex-1 space-y-1.5 overflow-hidden">

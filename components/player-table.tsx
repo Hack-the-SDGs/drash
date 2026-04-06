@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { toast } from "sonner";
+import { PlayerHead } from "@/components/player-head";
 import { useDict } from "@/components/dict-provider";
 import { deletePlayerAction } from "@/lib/actions/players";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -93,21 +93,7 @@ export function PlayerTable({ players, userMap, lang }: PlayerTableProps) {
                 <TableRow key={player.uuid}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded bg-muted">
-                        {player.skinUrl ? (
-                          <Image
-                            src={player.skinUrl}
-                            alt={player.name}
-                            width={32}
-                            height={32}
-                            className="size-full object-contain"
-                            style={{ imageRendering: "pixelated" }}
-                            unoptimized
-                          />
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
-                      </div>
+                      <PlayerHead skinUrl={player.skinUrl} size={32} />
                       <Link
                         href={`/${lang}/admin/players/${player.uuid}`}
                         className="font-medium hover:underline"
