@@ -21,7 +21,8 @@ import {
 import { createUserAction } from "@/lib/actions/users";
 import { useDict } from "@/components/dict-provider";
 import { toast } from "sonner";
-import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronUpIcon, SearchIcon, Loader2Icon } from "lucide-react";
+import { lookupMojangUuid } from "@/lib/mojang";
 
 interface CreateUserFormProps {
   lang: string;
@@ -34,9 +35,31 @@ export function CreateUserForm({ lang, isRoot }: CreateUserFormProps) {
   const [isPending, startTransition] = useTransition();
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [skinModel, setSkinModel] = useState<string | null>("classic");
+  const [existingPlayerChecked, setExistingPlayerChecked] = useState(false);
+  const [mojangUsername, setMojangUsername] = useState("");
+  const [mojangResult, setMojangResult] = useState<{ uuid: string; name: string } | null>(null);
+  const [mojangError, setMojangError] = useState(false);
+  const [isLookingUp, setIsLookingUp] = useState(false);
+
+  async function handleMojangLookup() {
+    if (!mojangUsername.trim()) return;
+    setIsLookingUp(true);
+    setMojangError(false);
+    setMojangResult(null);
+    const result = await lookupMojangUuid(mojangUsername.trim());
+    if (result) {
+      setMojangResult(result);
+    } else {
+      setMojangError(true);
+    }
+    setIsLookingUp(false);
+  }
 
   function handleSubmit(formData: FormData) {
     if (skinModel) formData.set("skinModel", skinModel);
+    if (existingPlayerChecked && mojangResult) {
+      formData.set("chosenUuid", mojangResult.uuid);
+    }
     startTransition(async () => {
       const result = await createUserAction(formData);
       if (result.success) {
@@ -177,11 +200,50 @@ export function CreateUserForm({ lang, isRoot }: CreateUserFormProps) {
                       name="existingPlayer"
                       type="checkbox"
                       value="true"
+                      checked={existingPlayerChecked}
+                      onChange={(e) => setExistingPlayerChecked(e.target.checked)}
                       className="size-4 rounded border"
                     />
                     <Label htmlFor="existingPlayer">{dict.users.existingPlayer}</Label>
                   </div>
                 </div>
+
+                {existingPlayerChecked && (
+                  <div className="space-y-3 rounded-md border p-3">
+                    <div className="space-y-1.5">
+                      <Label>{dict.player.mojangUsername}</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          value={mojangUsername}
+                          onChange={(e) => {
+                            setMojangUsername(e.target.value);
+                            setMojangError(false);
+                            setMojangResult(null);
+                          }}
+                          placeholder="Steve"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleMojangLookup}
+                          disabled={isLookingUp || !mojangUsername.trim()}
+                        >
+                          {isLookingUp ? <Loader2Icon className="size-4 animate-spin" /> : <SearchIcon className="size-4" />}
+                          {dict.player.lookupMojang}
+                        </Button>
+                      </div>
+                      {mojangResult && (
+                        <p className="text-sm text-green-600">
+                          {dict.player.mojangFound.replace("{name}", mojangResult.name)}
+                          <span className="ml-1 font-mono text-xs text-muted-foreground">{mojangResult.uuid}</span>
+                        </p>
+                      )}
+                      {mojangError && (
+                        <p className="text-sm text-destructive">{dict.player.mojangNotFound}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="flex flex-col gap-1.5">
