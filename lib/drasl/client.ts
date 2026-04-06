@@ -54,9 +54,15 @@ export async function draslFetch<T>(
   });
 
   if (res.status === 401 || res.status === 403) {
-    const cookieStore = await cookies();
-    cookieStore.delete("drasl_token");
-    cookieStore.delete("drasl_user");
+    // Only clear cookies in mutable contexts (Server Actions / Route Handlers).
+    // In server components / ISR revalidation, cookies are read-only.
+    try {
+      const cookieStore = await cookies();
+      cookieStore.delete("drasl_token");
+      cookieStore.delete("drasl_user");
+    } catch {
+      // Ignored — cookies are read-only in this context
+    }
     redirect("/login");
   }
 
