@@ -77,7 +77,8 @@ export function ProfilePlayers({
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {players.map((player) => {
-              const canDelete = isStaff && canDeletePlayer(userRole, username, player.name, username, userRole);
+              const canManage = isStaff || userRole === "admin" || userRole === "root";
+              const canDelete = canManage && canDeletePlayer(userRole, username, player.name, username, userRole);
               const mojang = isMojangPlayer(player);
 
               return (
@@ -101,7 +102,7 @@ export function ProfilePlayers({
                           </Button>
                         </Link>
                       )}
-                      {isStaff && (
+                      {canManage && (
                         <Button
                           variant="ghost"
                           size="icon-sm"
