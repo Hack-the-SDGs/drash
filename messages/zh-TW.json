@@ -171,7 +171,17 @@
     "batchDeleteConfirm": "確定要刪除 {count} 位使用者嗎？此操作無法復原。",
     "batchLocked": "鎖定 {success} 筆，失敗 {failed} 筆",
     "batchUnlocked": "解鎖 {success} 筆，失敗 {failed} 筆",
-    "batchDeleted": "刪除 {success} 筆，失敗 {failed} 筆"
+    "batchDeleted": "刪除 {success} 筆，失敗 {failed} 筆",
+    "batchSetMaxPlayers": "設定玩家上限",
+    "batchSetMaxPlayersPrompt": "為 {count} 位使用者設定玩家上限：",
+    "batchMaxPlayersSet": "更新 {success} 筆，失敗 {failed} 筆",
+    "batchResetApiToken": "重設 API Token",
+    "batchResetApiTokenConfirm": "確定要重設 {count} 位使用者的 API Token？",
+    "batchApiTokenReset": "重設 {success} 筆，失敗 {failed} 筆",
+    "batchResetMinecraftToken": "重設 MC Token",
+    "batchResetMinecraftTokenConfirm": "確定要重設 {count} 位使用者的 Minecraft Token？",
+    "batchMinecraftTokenReset": "重設 {success} 筆，失敗 {failed} 筆",
+    "selectionHint": "Ctrl+點擊選取，Shift+點擊範圍選取"
   },
   "invites": {
     "title": "邀請碼管理",

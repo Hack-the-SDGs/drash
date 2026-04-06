@@ -171,7 +171,17 @@
     "batchDeleteConfirm": "Are you sure you want to delete {count} users? This cannot be undone.",
     "batchLocked": "{success} locked, {failed} failed",
     "batchUnlocked": "{success} unlocked, {failed} failed",
-    "batchDeleted": "{success} deleted, {failed} failed"
+    "batchDeleted": "{success} deleted, {failed} failed",
+    "batchSetMaxPlayers": "Set Player Limit",
+    "batchSetMaxPlayersPrompt": "Max player count for {count} users:",
+    "batchMaxPlayersSet": "{success} updated, {failed} failed",
+    "batchResetApiToken": "Reset API Token",
+    "batchResetApiTokenConfirm": "Reset API tokens for {count} users?",
+    "batchApiTokenReset": "{success} reset, {failed} failed",
+    "batchResetMinecraftToken": "Reset MC Token",
+    "batchResetMinecraftTokenConfirm": "Reset Minecraft tokens for {count} users?",
+    "batchMinecraftTokenReset": "{success} reset, {failed} failed",
+    "selectionHint": "Ctrl+Click to select, Shift+Click for range"
   },
   "invites": {
     "title": "Invites",

@@ -357,6 +357,64 @@ export async function batchDeleteUsersAction(uuids: string[]): Promise<BatchActi
   return results;
 }
 
+export async function batchSetMaxPlayerCountAction(
+  uuids: string[],
+  maxPlayerCount: number,
+): Promise<BatchActionResult[]> {
+  const results: BatchActionResult[] = [];
+
+  for (const uuid of uuids) {
+    try {
+      await updateUser(uuid, { maxPlayerCount });
+      results.push({ uuid, success: true });
+    } catch (e) {
+      const message = e instanceof DraslAPIError ? e.message : "Unknown error";
+      results.push({ uuid, success: false, error: message });
+    }
+  }
+
+  updateTag("users");
+  return results;
+}
+
+export async function batchResetApiTokenAction(
+  uuids: string[],
+): Promise<BatchActionResult[]> {
+  const results: BatchActionResult[] = [];
+
+  for (const uuid of uuids) {
+    try {
+      await updateUser(uuid, { resetApiToken: true });
+      results.push({ uuid, success: true });
+    } catch (e) {
+      const message = e instanceof DraslAPIError ? e.message : "Unknown error";
+      results.push({ uuid, success: false, error: message });
+    }
+  }
+
+  updateTag("users");
+  return results;
+}
+
+export async function batchResetMinecraftTokenAction(
+  uuids: string[],
+): Promise<BatchActionResult[]> {
+  const results: BatchActionResult[] = [];
+
+  for (const uuid of uuids) {
+    try {
+      await updateUser(uuid, { resetMinecraftToken: true });
+      results.push({ uuid, success: true });
+    } catch (e) {
+      const message = e instanceof DraslAPIError ? e.message : "Unknown error";
+      results.push({ uuid, success: false, error: message });
+    }
+  }
+
+  updateTag("users");
+  return results;
+}
+
 export async function batchCreateUsersAction(
   users: BatchUserInput[],
 ): Promise<BatchResult[]> {
