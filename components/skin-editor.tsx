@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UploadIcon, Trash2Icon, SaveIcon } from "lucide-react";
+import { getDefaultSkinUrl, getDefaultSkinType } from "@/lib/default-skin";
 import type { APIPlayer } from "@/lib/types";
 
 type PlayerDict = {
@@ -151,9 +152,12 @@ export function SkinEditor({ player, dict, commonDict, lang, readonly }: SkinEdi
     setCapeCleared(false);
   };
 
-  // Determine what to show in the 3D preview
-  const displaySkinUrl = skinCleared ? undefined : (localSkinUrl || (skinUrlInput ? skinUrlInput : player.skinUrl) || undefined);
+  // Determine what to show in the 3D preview (fall back to default Steve/Alex)
+  const defaultSkin = getDefaultSkinUrl(player.uuid);
+  const defaultSkinModel = getDefaultSkinType(player.uuid);
+  const displaySkinUrl = skinCleared ? defaultSkin : (localSkinUrl || (skinUrlInput ? skinUrlInput : player.skinUrl) || defaultSkin);
   const displayCapeUrl = capeCleared ? undefined : (localCapeUrl || (capeUrlInput ? capeUrlInput : player.capeUrl) || undefined);
+  const displaySkinModel = displaySkinUrl === defaultSkin ? defaultSkinModel : skinModel;
 
   return (
     <div className="space-y-6">
@@ -182,7 +186,7 @@ export function SkinEditor({ player, dict, commonDict, lang, readonly }: SkinEdi
             <SkinViewerComponent
               skinUrl={displaySkinUrl}
               capeUrl={displayCapeUrl}
-              skinModel={skinModel}
+              skinModel={displaySkinModel}
               width={300}
               height={400}
             />
