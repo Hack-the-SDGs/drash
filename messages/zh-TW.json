@@ -23,7 +23,10 @@
     "daysAgo": "{count} 天前",
     "hoursAgo": "{count} 小時前",
     "minutesAgo": "{count} 分鐘前",
-    "justNow": "剛剛"
+    "justNow": "剛剛",
+    "sortAsc": "升冪排序",
+    "sortDesc": "降冪排序",
+    "sort": "排序"
   },
   "auth": {
     "login": "登入",
@@ -53,7 +56,16 @@
     "myPlayers": "我的玩家",
     "editSkin": "編輯外觀",
     "createdAt": "建立時間",
-    "skinModel": "模型"
+    "skinModel": "模型",
+    "playerLimit": "玩家上限",
+    "unlimited": "無限制",
+    "changePassword": "修改密碼",
+    "newPassword": "新密碼",
+    "createPlayer": "建立玩家",
+    "deletePlayer": "刪除玩家",
+    "deletePlayerConfirm": "確定要刪除此玩家嗎？",
+    "staffDescription": "管理你的帳號與玩家",
+    "playerCount": "{current} / {max}"
   },
   "player": {
     "title": "編輯玩家",
@@ -80,7 +92,17 @@
     "saved": "玩家更新成功",
     "deleted": "玩家已刪除",
     "owner": "所屬使用者",
-    "description": "管理所有玩家資料"
+    "description": "管理所有玩家資料",
+    "createPlayer": "建立玩家",
+    "mojangTextures": "材質由 Mojang 管理，無法在此修改",
+    "newPlayer": "新玩家",
+    "existingPlayerMode": "現有玩家",
+    "lookupMojang": "查詢",
+    "mojangUsername": "Minecraft 使用者名稱",
+    "orEnterUuid": "或直接輸入 UUID",
+    "mojangNotFound": "在 Mojang 找不到此玩家",
+    "mojangFound": "找到：{name}",
+    "selectOwner": "選擇所屬使用者"
   },
   "users": {
     "title": "使用者管理",
@@ -120,7 +142,22 @@
     "requestApiToken": "請求 API Token",
     "selfIndicator": "（你自己）",
     "cannotLockSelf": "無法鎖定自己的帳號",
-    "cannotDeleteSelf": "無法刪除自己的帳號"
+    "cannotDeleteSelf": "無法刪除自己的帳號",
+    "batchCreate": "批量建立",
+    "batchCreateTitle": "批量建立使用者",
+    "formMode": "表單模式",
+    "importMode": "匯入模式",
+    "autoCreatePlayer": "自動為每位使用者建立同名玩家",
+    "addRow": "新增一行",
+    "csvFormat": "CSV 格式：username,password[,maxPlayerCount,isAdmin,isLocked,preferredLanguage]",
+    "uploadCsv": "上傳 CSV",
+    "preview": "預覽",
+    "willCreate": "將建立 {count} 位使用者",
+    "creating": "建立中... {current}/{total}",
+    "batchResult": "成功 {success} 筆，失敗 {failed} 筆",
+    "retryFailed": "重試失敗項目",
+    "cannotLockHigherRole": "無法鎖定同級或更高權限的使用者",
+    "cannotDeleteSameNamePlayer": "無法刪除與使用者同名的玩家"
   },
   "invites": {
     "title": "邀請碼管理",
