@@ -288,6 +288,75 @@ export interface BatchResult {
   error?: string;
 }
 
+export interface BatchActionResult {
+  uuid: string;
+  success: boolean;
+  error?: string;
+}
+
+export async function batchLockUsersAction(uuids: string[]): Promise<BatchActionResult[]> {
+  const { getSession } = await import("@/lib/drasl/auth");
+  const session = await getSession();
+  const results: BatchActionResult[] = [];
+
+  for (const uuid of uuids) {
+    if (session?.uuid === uuid) {
+      results.push({ uuid, success: false, error: "Cannot lock your own account" });
+      continue;
+    }
+    try {
+      await updateUser(uuid, { isLocked: true });
+      results.push({ uuid, success: true });
+    } catch (e) {
+      const message = e instanceof DraslAPIError ? e.message : "Unknown error";
+      results.push({ uuid, success: false, error: message });
+    }
+  }
+
+  updateTag("users");
+  return results;
+}
+
+export async function batchUnlockUsersAction(uuids: string[]): Promise<BatchActionResult[]> {
+  const results: BatchActionResult[] = [];
+
+  for (const uuid of uuids) {
+    try {
+      await updateUser(uuid, { isLocked: false });
+      results.push({ uuid, success: true });
+    } catch (e) {
+      const message = e instanceof DraslAPIError ? e.message : "Unknown error";
+      results.push({ uuid, success: false, error: message });
+    }
+  }
+
+  updateTag("users");
+  return results;
+}
+
+export async function batchDeleteUsersAction(uuids: string[]): Promise<BatchActionResult[]> {
+  const { getSession } = await import("@/lib/drasl/auth");
+  const session = await getSession();
+  const results: BatchActionResult[] = [];
+
+  for (const uuid of uuids) {
+    if (session?.uuid === uuid) {
+      results.push({ uuid, success: false, error: "Cannot delete your own account" });
+      continue;
+    }
+    try {
+      await deleteUser(uuid);
+      results.push({ uuid, success: true });
+    } catch (e) {
+      const message = e instanceof DraslAPIError ? e.message : "Unknown error";
+      results.push({ uuid, success: false, error: message });
+    }
+  }
+
+  updateTag("users");
+  return results;
+}
+
 export async function batchCreateUsersAction(
   users: BatchUserInput[],
 ): Promise<BatchResult[]> {
