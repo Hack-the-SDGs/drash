@@ -178,6 +178,8 @@ export function PlayerTable({ players, userMap, userRoleMap, users, lang, viewer
               sorted.map((player) => {
                 const manageable = canManage(player);
                 const isSelected = selected.has(player.uuid);
+                const ownerRole = userRoleMap[player.userUuid] ?? "user";
+                const roleColor = ownerRole === "root" ? "text-red-500" : ownerRole === "admin" ? "text-amber-500" : undefined;
 
                 return (
                   <TableRow
@@ -193,7 +195,7 @@ export function PlayerTable({ players, userMap, userRoleMap, users, lang, viewer
                         {manageable ? (
                           <Link
                             href={`/${lang}/admin/players/${player.uuid}`}
-                            className="font-medium hover:underline"
+                            className={`font-medium hover:underline${roleColor ? ` ${roleColor}` : ""}`}
                             onClick={(e) => {
                               if (e.metaKey || e.ctrlKey || e.shiftKey) e.preventDefault();
                             }}
@@ -201,7 +203,7 @@ export function PlayerTable({ players, userMap, userRoleMap, users, lang, viewer
                             {player.name}
                           </Link>
                         ) : (
-                          <span className="font-medium">{player.name}</span>
+                          <span className={`font-medium${roleColor ? ` ${roleColor}` : ""}`}>{player.name}</span>
                         )}
                       </div>
                     </TableCell>
@@ -211,7 +213,7 @@ export function PlayerTable({ players, userMap, userRoleMap, users, lang, viewer
                     <TableCell>
                       <Link
                         href={`/${lang}/admin/users/${player.userUuid}`}
-                        className="hover:underline"
+                        className={`hover:underline${roleColor ? ` ${roleColor}` : ""}`}
                         onClick={(e) => {
                           if (e.metaKey || e.ctrlKey || e.shiftKey) e.preventDefault();
                         }}

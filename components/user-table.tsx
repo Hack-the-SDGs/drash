@@ -268,6 +268,7 @@ export function UserTable({ users, lang, currentUserUuid, viewerRole, userRoles 
                 const targetRole = userRoles[user.uuid] ?? "user";
                 const canLock = canLockUser(viewerRole, targetRole, isSelf);
                 const isSelected = selected.has(user.uuid);
+                const roleColor = targetRole === "root" ? "text-red-500" : targetRole === "admin" ? "text-amber-500" : undefined;
 
                 return (
                   <TableRow
@@ -288,7 +289,7 @@ export function UserTable({ users, lang, currentUserUuid, viewerRole, userRoles 
                         <div className="flex items-center gap-2">
                           <Link
                             href={`/${lang}/admin/users/${user.uuid}`}
-                            className="font-medium hover:underline"
+                            className={`font-medium hover:underline${roleColor ? ` ${roleColor}` : ""}`}
                             onClick={(e) => {
                               // Prevent navigation on Ctrl/Shift click (selection)
                               if (e.metaKey || e.ctrlKey || e.shiftKey) e.preventDefault();
