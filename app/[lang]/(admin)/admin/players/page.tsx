@@ -1,6 +1,8 @@
 import { getDictionary, type Locale } from "@/lib/dictionaries";
 import { getPlayers } from "@/lib/drasl/players";
 import { getUsers } from "@/lib/drasl/users";
+import { getCurrentUser } from "@/lib/drasl/auth";
+import { getRole } from "@/lib/drasl/auth";
 import { PlayerTable } from "@/components/player-table";
 import { resolvePlayerTextures } from "@/lib/drasl/textures";
 
@@ -10,7 +12,7 @@ export default async function PlayersPage(
   const { lang } = await props.params;
   const dict = await getDictionary(lang as Locale);
 
-  const [players, users] = await Promise.all([getPlayers(), getUsers()]);
+  const [players, users, currentUser] = await Promise.all([getPlayers(), getUsers(), getCurrentUser()]);
 
   // Resolve textures for all players (handles Mojang fallback)
   const playersWithTextures = await Promise.all(
@@ -21,8 +23,10 @@ export default async function PlayersPage(
   );
 
   const userMap: Record<string, string> = {};
+  const userRoleMap: Record<string, import("@/lib/types").Role> = {};
   for (const user of users) {
     userMap[user.uuid] = user.username;
+    userRoleMap[user.uuid] = getRole(user);
   }
 
   return (
@@ -33,7 +37,7 @@ export default async function PlayersPage(
           <p className="text-muted-foreground">{dict.player.description}</p>
         </div>
       </div>
-      <PlayerTable players={playersWithTextures} userMap={userMap} users={users} lang={lang} />
+      <PlayerTable players={playersWithTextures} userMap={userMap} userRoleMap={userRoleMap} users={users} lang={lang} viewerRole={getRole(currentUser)} viewerUsername={currentUser.username} />
     </div>
   );
 }

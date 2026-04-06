@@ -21,21 +21,35 @@ import {
 } from "@/components/ui/table";
 import { PencilIcon, Trash2Icon, SearchIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon } from "lucide-react";
 import { useSortable } from "@/hooks/use-sortable";
-import type { APIPlayer, APIUser } from "@/lib/types";
+import { canDeletePlayer } from "@/lib/permissions";
+import type { APIPlayer, APIUser, Role } from "@/lib/types";
 
 interface PlayerTableProps {
   players: APIPlayer[];
   userMap: Record<string, string>;
+  /** Map from user UUID to their role */
+  userRoleMap: Record<string, Role>;
   users: APIUser[];
   lang: string;
+  viewerRole: Role;
+  viewerUsername: string;
 }
 
-export function PlayerTable({ players, userMap, users, lang }: PlayerTableProps) {
+export function PlayerTable({ players, userMap, userRoleMap, users, lang, viewerRole, viewerUsername }: PlayerTableProps) {
   const dict = useDict();
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<APIPlayer | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  /** Whether the current viewer can manage (edit/delete) a player */
+  function canManage(player: APIPlayer): boolean {
+    const ownerRole = userRoleMap[player.userUuid] ?? "user";
+    // root can manage all; admin can only manage user's players
+    if (viewerRole === "root") return true;
+    if (viewerRole === "admin" && ownerRole === "user") return true;
+    return false;
+  }
 
   const filtered = players.filter((p) => {
     const q = search.toLowerCase();
@@ -152,12 +166,16 @@ export function PlayerTable({ players, userMap, users, lang }: PlayerTableProps)
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <PlayerHead skinUrl={player.skinUrl} size={32} />
-                      <Link
-                        href={`/${lang}/admin/players/${player.uuid}`}
-                        className="font-medium hover:underline"
-                      >
-                        {player.name}
-                      </Link>
+                      {canManage(player) ? (
+                        <Link
+                          href={`/${lang}/admin/players/${player.uuid}`}
+                          className="font-medium hover:underline"
+                        >
+                          {player.name}
+                        </Link>
+                      ) : (
+                        <span className="font-medium">{player.name}</span>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell className="font-mono text-xs">
@@ -175,24 +193,26 @@ export function PlayerTable({ players, userMap, users, lang }: PlayerTableProps)
                     <Badge variant="secondary">{player.skinModel === "slim" ? dict.player.slim : dict.player.classic}</Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        nativeButton={false}
-                        render={<Link href={`/${lang}/admin/players/${player.uuid}`} />}
-                      >
-                        <PencilIcon className="size-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => setDeleteTarget(player)}
-                        disabled={isPending}
-                      >
-                        <Trash2Icon className="size-4 text-destructive" />
-                      </Button>
-                    </div>
+                    {canManage(player) ? (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          nativeButton={false}
+                          render={<Link href={`/${lang}/admin/players/${player.uuid}`} />}
+                        >
+                          <PencilIcon className="size-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => setDeleteTarget(player)}
+                          disabled={isPending || !canDeletePlayer(viewerRole, viewerUsername, player.name, userMap[player.userUuid] ?? "", userRoleMap[player.userUuid] ?? "user")}
+                        >
+                          <Trash2Icon className="size-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ) : null}
                   </TableCell>
                 </TableRow>
               ))
