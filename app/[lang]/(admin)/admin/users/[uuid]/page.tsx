@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { getSession, getRole } from "@/lib/drasl/auth";
+import { getSession, getRole, scrapeUserTokens } from "@/lib/drasl/auth";
 import { getDictionary, type Locale } from "@/lib/dictionaries";
 import { getUser } from "@/lib/drasl/users";
 import { DraslAPIError } from "@/lib/drasl/client";
@@ -27,6 +27,12 @@ export default async function EditUserPage(
   }
 
   const targetRole = getRole(user);
+
+  // Drasl REST API doesn't return tokens in GET responses.
+  // Scrape them from the Drasl web UI instead.
+  const tokens = await scrapeUserTokens(uuid);
+  if (tokens.apiToken) user.apiToken = tokens.apiToken;
+  if (tokens.minecraftToken) user.minecraftToken = tokens.minecraftToken;
 
   return (
     <div className="space-y-6">
