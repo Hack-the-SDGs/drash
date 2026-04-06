@@ -14,24 +14,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  PencilIcon,
   UserIcon,
   ShieldCheckIcon,
   LockIcon,
   SettingsIcon,
 } from "lucide-react";
-import { PlayerHead } from "@/components/player-head";
-
-function formatRelativeTime(dateStr: string, lang: string): string {
-  if (!dateStr) return "-";
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString(lang === "zh-TW" ? "zh-TW" : "en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
+import { isStaff as checkIsStaff } from "@/lib/permissions";
+import { ProfilePlayers } from "@/components/profile-players";
+import { ProfilePassword } from "@/components/profile-password";
 
 export default async function ProfilePage(
   props: { params: Promise<{ lang: string }> },
@@ -60,6 +50,7 @@ export default async function ProfilePage(
   );
 
   const role = getRole(user);
+  const staff = checkIsStaff(user);
 
   const roleBadgeVariant = role === "root"
     ? "destructive"
@@ -148,69 +139,32 @@ export default async function ProfilePage(
                 </div>
               )}
             </div>
+            <div>
+              <p className="text-xs text-muted-foreground">{dict.profile.playerLimit}</p>
+              <p className="text-sm font-medium">
+                {user.maxPlayerCount === -1
+                  ? dict.profile.unlimited
+                  : dict.profile.playerCount
+                      .replace("{current}", String(user.players.length))
+                      .replace("{max}", String(user.maxPlayerCount))}
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
 
+      {staff && <ProfilePassword userUuid={user.uuid} />}
+
       {/* My Players section */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold">{dict.profile.myPlayers}</h2>
-          <Badge variant="secondary">
-            {dict.common.total.replace("{count}", String(user.players.length))}
-          </Badge>
-        </div>
-
-        {user.players.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-center text-sm text-muted-foreground">
-              {dict.common.noData}
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {playersWithTextures.map((player) => (
-              <Card key={player.uuid}>
-                <CardContent className="flex items-start gap-4 p-4">
-                  <PlayerHead
-                    skinUrl={player.skinUrl}
-                    size={48}
-                    className="shrink-0"
-                  />
-
-                  {/* Player info */}
-                  <div className="flex-1 space-y-1.5 overflow-hidden">
-                    <p className="truncate text-sm font-medium">
-                      {player.name}
-                    </p>
-                    <p className="truncate font-mono text-xs text-muted-foreground">
-                      {player.uuid}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      <Badge variant="outline" className="text-xs">
-                        {dict.profile.skinModel}: {player.skinModel === "slim" ? dict.player.slim : dict.player.classic}
-                      </Badge>
-                    </div>
-                    {player.createdAt && (
-                      <p className="text-xs text-muted-foreground">
-                        {dict.profile.createdAt}: {formatRelativeTime(player.createdAt, lang)}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Edit link */}
-                  <Link href={`/${lang}/players/${player.uuid}`}>
-                    <Button variant="ghost" size="icon-sm">
-                      <PencilIcon className="size-4" />
-                      <span className="sr-only">{dict.profile.editSkin}</span>
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+      <ProfilePlayers
+        players={playersWithTextures}
+        userUuid={user.uuid}
+        username={user.username}
+        userRole={role}
+        maxPlayerCount={user.maxPlayerCount}
+        isStaff={staff}
+        lang={lang}
+      />
     </div>
   );
 }
