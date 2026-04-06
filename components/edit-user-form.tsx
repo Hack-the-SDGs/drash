@@ -32,8 +32,10 @@ import {
   createUserOIDCAction,
   deleteUserOIDCAction,
 } from "@/lib/actions/users";
-import { createPlayerAction } from "@/lib/actions/players";
+import { deletePlayerAction } from "@/lib/actions/players";
 import { useDict } from "@/components/dict-provider";
+import { canDeletePlayer, canLockUser } from "@/lib/permissions";
+import { CreatePlayerDialog } from "@/components/create-player-dialog";
 import { toast } from "sonner";
 import type { APIUser, Role } from "@/lib/types";
 import {
@@ -49,13 +51,16 @@ interface EditUserFormProps {
   user: APIUser;
   lang: string;
   viewerRole: Role;
+  viewerUsername: string;
+  targetRole: Role;
 }
 
-export function EditUserForm({ user, lang, viewerRole }: EditUserFormProps) {
+export function EditUserForm({ user, lang, viewerRole, viewerUsername, targetRole }: EditUserFormProps) {
   const dict = useDict();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const isRoot = viewerRole === "root";
+  const canLock = canLockUser(viewerRole, targetRole, false);
 
   // Dialog states
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -64,6 +69,7 @@ export function EditUserForm({ user, lang, viewerRole }: EditUserFormProps) {
   const [addPlayerOpen, setAddPlayerOpen] = useState(false);
   const [addOidcOpen, setAddOidcOpen] = useState(false);
   const [removeOidcIssuer, setRemoveOidcIssuer] = useState<string | null>(null);
+  const [deletePlayerTarget, setDeletePlayerTarget] = useState<{ uuid: string; name: string } | null>(null);
 
   function copyToClipboard(text: string) {
     navigator.clipboard.writeText(text);
@@ -160,17 +166,17 @@ export function EditUserForm({ user, lang, viewerRole }: EditUserFormProps) {
     });
   }
 
-  // -- Add Player --
-  function handleAddPlayer(formData: FormData) {
-    formData.set("userUuid", user.uuid);
+  // -- Delete Player --
+  function handleDeletePlayer() {
+    if (!deletePlayerTarget) return;
     startTransition(async () => {
-      const result = await createPlayerAction(formData);
+      const result = await deletePlayerAction(deletePlayerTarget.uuid);
       if (result.success) {
-        toast.success(dict.users.updated);
-        setAddPlayerOpen(false);
+        toast.success(dict.player.deleted);
       } else {
-        toast.error(result.error);
+        toast.error(result.error ?? dict.errors.unknown);
       }
+      setDeletePlayerTarget(null);
     });
   }
 
@@ -298,7 +304,8 @@ export function EditUserForm({ user, lang, viewerRole }: EditUserFormProps) {
                 type="button"
                 variant="outline"
                 onClick={handleLockToggle}
-                disabled={isPending}
+                disabled={isPending || !canLock}
+                title={!canLock ? dict.users.cannotLockHigherRole : undefined}
               >
                 {user.isLocked ? dict.users.unlock : dict.users.lock}
               </Button>
@@ -364,29 +371,29 @@ export function EditUserForm({ user, lang, viewerRole }: EditUserFormProps) {
             <p className="text-sm text-muted-foreground">{dict.common.noData}</p>
           ) : (
             <div className="space-y-2">
-              {user.players.map((player) => (
-                <div
-                  key={player.uuid}
-                  className="flex items-center justify-between rounded-md border px-3 py-2"
-                >
-                  <div>
-                    <span className="font-medium">{player.name}</span>
-                    <span className="ml-2 text-xs text-muted-foreground font-mono">
-                      {player.uuid}
-                    </span>
+              {user.players.map((player) => {
+                const canDelete = canDeletePlayer(viewerRole, viewerUsername, player.name, user.username, targetRole);
+                return (
+                  <div key={player.uuid} className="flex items-center justify-between rounded-md border px-3 py-2">
+                    <div>
+                      <span className="font-medium">{player.name}</span>
+                      <span className="ml-2 text-xs text-muted-foreground font-mono">{player.uuid}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" nativeButton={false}
+                        render={<Link href={`/${lang}/admin/players/${player.uuid}`} />}>
+                        {dict.common.edit}
+                      </Button>
+                      <Button variant="ghost" size="icon-sm"
+                        onClick={() => setDeletePlayerTarget({ uuid: player.uuid, name: player.name })}
+                        disabled={!canDelete || isPending}
+                        title={!canDelete ? dict.users.cannotDeleteSameNamePlayer : undefined}>
+                        <Trash2Icon className="size-4 text-destructive" />
+                      </Button>
+                    </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    nativeButton={false}
-                    render={
-                      <Link href={`/${lang}/admin/players/${player.uuid}`} />
-                    }
-                  >
-                    {dict.common.edit}
-                  </Button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -510,43 +517,18 @@ export function EditUserForm({ user, lang, viewerRole }: EditUserFormProps) {
         pending={isPending}
       />
 
-      {/* Add Player Dialog */}
-      <Dialog open={addPlayerOpen} onOpenChange={setAddPlayerOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{dict.users.addPlayer}</DialogTitle>
-          </DialogHeader>
-          <form action={handleAddPlayer} className="space-y-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="playerName">{dict.player.name}</Label>
-              <Input
-                id="playerName"
-                name="name"
-                required
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="playerFallback">{dict.player.fallbackPlayer}</Label>
-              <Input
-                id="playerFallback"
-                name="fallbackPlayer"
-              />
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setAddPlayerOpen(false)}
-              >
-                {dict.common.cancel}
-              </Button>
-              <Button type="submit" disabled={isPending}>
-                {isPending ? dict.common.loading : dict.common.create}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <CreatePlayerDialog open={addPlayerOpen} onOpenChange={setAddPlayerOpen} userUuid={user.uuid} />
+
+      <ConfirmDialog
+        open={deletePlayerTarget !== null}
+        onOpenChange={(open) => { if (!open) setDeletePlayerTarget(null); }}
+        title={dict.profile.deletePlayer}
+        description={dict.profile.deletePlayerConfirm}
+        confirmLabel={dict.common.delete}
+        destructive
+        onConfirm={handleDeletePlayer}
+        pending={isPending}
+      />
 
       {/* Add OIDC Dialog */}
       <Dialog open={addOidcOpen} onOpenChange={setAddOidcOpen}>

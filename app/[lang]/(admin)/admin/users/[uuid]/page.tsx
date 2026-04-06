@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { getSession } from "@/lib/drasl/auth";
+import { getSession, getRole } from "@/lib/drasl/auth";
 import { getDictionary, type Locale } from "@/lib/dictionaries";
 import { getUser } from "@/lib/drasl/users";
 import { EditUserForm } from "@/components/edit-user-form";
@@ -24,6 +24,8 @@ export default async function EditUserPage(
     notFound();
   }
 
+  const targetRole = getRole(user);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -39,7 +41,7 @@ export default async function EditUserPage(
           {dict.users.editUser}: {user.username}
         </h1>
       </div>
-      <EditUserForm user={user} lang={lang} viewerRole={session.role} />
+      <EditUserForm user={user} lang={lang} viewerRole={session.role} viewerUsername={session.username} targetRole={targetRole} />
     </div>
   );
 }

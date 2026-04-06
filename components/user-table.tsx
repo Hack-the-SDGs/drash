@@ -28,7 +28,7 @@ import {
 } from "@/lib/actions/users";
 import { useDict } from "@/components/dict-provider";
 import { toast } from "sonner";
-import type { APIUser } from "@/lib/types";
+import type { APIUser, Role } from "@/lib/types";
 import {
   MoreHorizontalIcon,
   PencilIcon,
@@ -37,15 +37,21 @@ import {
   Trash2Icon,
   PlusIcon,
   ShieldCheckIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
 } from "lucide-react";
+import { useSortable } from "@/hooks/use-sortable";
+import { canLockUser } from "@/lib/permissions";
 
 interface UserTableProps {
   users: APIUser[];
   lang: string;
   currentUserUuid: string;
+  viewerRole: Role;
+  userRoles: Record<string, Role>;
 }
 
-export function UserTable({ users, lang, currentUserUuid }: UserTableProps) {
+export function UserTable({ users, lang, currentUserUuid, viewerRole, userRoles }: UserTableProps) {
   const dict = useDict();
   const [search, setSearch] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -54,6 +60,23 @@ export function UserTable({ users, lang, currentUserUuid }: UserTableProps) {
   const filtered = users.filter((u) =>
     u.username.toLowerCase().includes(search.toLowerCase()),
   );
+
+  const { sorted, sortKey, direction, toggleSort } = useSortable(filtered, {
+    defaultKey: "adminFirst",
+    defaultDirection: "asc",
+    sortFns: {
+      adminFirst: (a, b) => {
+        if (a.isAdmin !== b.isAdmin) return a.isAdmin ? -1 : 1;
+        return a.username.localeCompare(b.username);
+      },
+      username: (a, b) => a.username.localeCompare(b.username),
+      locked: (a, b) => {
+        if (a.isLocked !== b.isLocked) return a.isLocked ? -1 : 1;
+        return a.username.localeCompare(b.username);
+      },
+      playerCount: (a, b) => (a.players?.length ?? 0) - (b.players?.length ?? 0),
+    },
+  });
 
   function handleLockToggle(user: APIUser) {
     startTransition(async () => {
@@ -97,24 +120,50 @@ export function UserTable({ users, lang, currentUserUuid }: UserTableProps) {
             {dict.common.total.replace("{count}", String(filtered.length))}
           </Badge>
         </div>
-        <Button
-          size="sm"
-          nativeButton={false}
-          render={<Link href={`/${lang}/admin/users/new`} />}
-        >
-          <PlusIcon className="size-4" data-icon="inline-start" />
-          {dict.users.createUser}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" nativeButton={false} render={<Link href={`/${lang}/admin/users/batch`} />}>
+            <PlusIcon className="size-4" data-icon="inline-start" />
+            {dict.users.batchCreate}
+          </Button>
+          <Button
+            size="sm"
+            nativeButton={false}
+            render={<Link href={`/${lang}/admin/users/new`} />}
+          >
+            <PlusIcon className="size-4" data-icon="inline-start" />
+            {dict.users.createUser}
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>{dict.users.username}</TableHead>
-              <TableHead>{dict.users.isAdmin}</TableHead>
-              <TableHead>{dict.users.isLocked}</TableHead>
-              <TableHead>{dict.users.players}</TableHead>
+              <TableHead>
+                <button className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("username")}>
+                  {dict.users.username}
+                  {sortKey === "username" && (direction === "asc" ? <ArrowUpIcon className="size-3" /> : <ArrowDownIcon className="size-3" />)}
+                </button>
+              </TableHead>
+              <TableHead>
+                <button className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("adminFirst")}>
+                  {dict.users.isAdmin}
+                  {sortKey === "adminFirst" && (direction === "asc" ? <ArrowUpIcon className="size-3" /> : <ArrowDownIcon className="size-3" />)}
+                </button>
+              </TableHead>
+              <TableHead>
+                <button className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("locked")}>
+                  {dict.users.isLocked}
+                  {sortKey === "locked" && (direction === "asc" ? <ArrowUpIcon className="size-3" /> : <ArrowDownIcon className="size-3" />)}
+                </button>
+              </TableHead>
+              <TableHead>
+                <button className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("playerCount")}>
+                  {dict.users.players}
+                  {sortKey === "playerCount" && (direction === "asc" ? <ArrowUpIcon className="size-3" /> : <ArrowDownIcon className="size-3" />)}
+                </button>
+              </TableHead>
               <TableHead className="w-[60px]">{dict.common.actions}</TableHead>
             </TableRow>
           </TableHeader>
@@ -126,9 +175,11 @@ export function UserTable({ users, lang, currentUserUuid }: UserTableProps) {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((user) => {
+              sorted.map((user) => {
                 const isSelf = user.uuid === currentUserUuid;
                 const playerNames = user.players?.map((p) => p.name) ?? [];
+                const targetRole = userRoles[user.uuid] ?? "user";
+                const canLock = canLockUser(viewerRole, targetRole, isSelf);
 
                 return (
                   <TableRow
@@ -199,8 +250,8 @@ export function UserTable({ users, lang, currentUserUuid }: UserTableProps) {
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => handleLockToggle(user)}
-                            disabled={isPending || isSelf}
-                            title={isSelf ? dict.users.cannotLockSelf : undefined}
+                            disabled={isPending || !canLock}
+                            title={!canLock ? (isSelf ? dict.users.cannotLockSelf : dict.users.cannotLockHigherRole) : undefined}
                           >
                             {user.isLocked ? (
                               <>
@@ -213,9 +264,9 @@ export function UserTable({ users, lang, currentUserUuid }: UserTableProps) {
                                 {dict.users.lock}
                               </>
                             )}
-                            {isSelf && (
+                            {!canLock && (
                               <span className="ml-auto text-xs text-muted-foreground">
-                                {dict.users.cannotLockSelf}
+                                {isSelf ? dict.users.cannotLockSelf : dict.users.cannotLockHigherRole}
                               </span>
                             )}
                           </DropdownMenuItem>
