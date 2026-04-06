@@ -255,3 +255,49 @@ export async function setAdminAction(uuid: string, isAdmin: boolean) {
     throw e;
   }
 }
+
+export interface BatchUserInput {
+  username: string;
+  password: string;
+  maxPlayerCount?: number;
+  isAdmin?: boolean;
+  isLocked?: boolean;
+  preferredLanguage?: string;
+  createPlayer?: boolean;
+}
+
+export interface BatchResult {
+  username: string;
+  success: boolean;
+  error?: string;
+}
+
+export async function batchCreateUsersAction(
+  users: BatchUserInput[],
+): Promise<BatchResult[]> {
+  const results: BatchResult[] = [];
+
+  for (const input of users) {
+    const data: APICreateUserRequest = {
+      username: input.username,
+      password: input.password,
+    };
+    if (input.maxPlayerCount !== undefined) data.maxPlayerCount = input.maxPlayerCount;
+    if (input.isAdmin) data.isAdmin = true;
+    if (input.isLocked) data.isLocked = true;
+    if (input.preferredLanguage) data.preferredLanguage = input.preferredLanguage;
+    if (input.createPlayer) data.playerName = input.username;
+
+    try {
+      await createUser(data);
+      results.push({ username: input.username, success: true });
+    } catch (e) {
+      const message = e instanceof DraslAPIError ? e.message : "Unknown error";
+      results.push({ username: input.username, success: false, error: message });
+    }
+  }
+
+  updateTag("users");
+  updateTag("players");
+  return results;
+}
