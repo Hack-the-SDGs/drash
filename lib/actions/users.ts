@@ -146,11 +146,15 @@ export async function deleteUserAction(uuid: string) {
 }
 
 export async function lockUserAction(uuid: string) {
-  // Prevent locking yourself
-  const { getSession } = await import("@/lib/drasl/auth");
+  const { getSession, getRole } = await import("@/lib/drasl/auth");
+  const { getUser } = await import("@/lib/drasl/users");
+  const { canLockUser } = await import("@/lib/permissions");
   const session = await getSession();
-  if (session?.uuid === uuid) {
-    return { success: false, error: "Cannot lock your own account" };
+  if (!session) return { success: false, error: "Unauthorized" };
+  const target = await getUser(uuid);
+  const targetRole = getRole(target);
+  if (!canLockUser(session.role, targetRole, session.uuid === uuid)) {
+    return { success: false, error: "Insufficient privileges" };
   }
 
   try {
@@ -403,9 +407,17 @@ export async function batchResetMinecraftTokenAction(
 export async function batchCreateUsersAction(
   users: BatchUserInput[],
 ): Promise<BatchResult[]> {
+  const { getSession } = await import("@/lib/drasl/auth");
+  const session = await getSession();
+  if (!session) return users.map(u => ({ username: u.username, success: false, error: "Unauthorized" }));
+
   const results: BatchResult[] = [];
 
   for (const input of users) {
+    if (input.isAdmin && session.role !== "root") {
+      results.push({ username: input.username, success: false, error: "Only root can create admin accounts" });
+      continue;
+    }
     const data: APICreateUserRequest = {
       username: input.username,
       password: input.password,

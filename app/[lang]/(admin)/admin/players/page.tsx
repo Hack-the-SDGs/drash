@@ -1,8 +1,7 @@
 import { getDictionary, type Locale } from "@/lib/dictionaries";
 import { getPlayers } from "@/lib/drasl/players";
 import { getUsers } from "@/lib/drasl/users";
-import { getCurrentUser } from "@/lib/drasl/auth";
-import { getRole } from "@/lib/drasl/auth";
+import { getCurrentUser, getRole } from "@/lib/drasl/auth";
 import { PlayerTable } from "@/components/player-table";
 import { resolvePlayerTextures } from "@/lib/drasl/textures";
 

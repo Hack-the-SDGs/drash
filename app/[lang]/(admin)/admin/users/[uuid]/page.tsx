@@ -27,6 +27,12 @@ export default async function EditUserPage(
   }
 
   const targetRole = getRole(user);
+  const canManage =
+    session.role === "root" ||
+    (session.role === "admin" && targetRole === "user");
+  if (!canManage) {
+    redirect(`/${lang}/admin/users`);
+  }
 
   // Drasl REST API doesn't return tokens in GET responses.
   // Scrape them from the Drasl web UI instead.
