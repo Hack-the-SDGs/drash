@@ -274,14 +274,14 @@ export function UserTable({ users, lang, currentUserUuid, viewerRole, userRoles 
                           <DropdownMenuItem
                             variant="destructive"
                             onClick={() => setDeleteTarget(user)}
-                            disabled={isSelf}
-                            title={isSelf ? dict.users.cannotDeleteSelf : undefined}
+                            disabled={!canLock}
+                            title={!canLock ? (isSelf ? dict.users.cannotDeleteSelf : dict.users.cannotLockHigherRole) : undefined}
                           >
                             <Trash2Icon className="size-4" />
                             {dict.users.deleteUser}
-                            {isSelf && (
+                            {!canLock && (
                               <span className="ml-auto text-xs text-muted-foreground">
-                                {dict.users.cannotDeleteSelf}
+                                {isSelf ? dict.users.cannotDeleteSelf : dict.users.cannotLockHigherRole}
                               </span>
                             )}
                           </DropdownMenuItem>

@@ -474,21 +474,23 @@ export function EditUserForm({ user, lang, viewerRole, viewerUsername, targetRol
       </Card>
 
       {/* Danger Zone */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-destructive">{dict.users.deleteUser}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Button
-            variant="destructive"
-            onClick={() => setDeleteOpen(true)}
-            disabled={isPending}
-          >
-            <Trash2Icon className="size-4" data-icon="inline-start" />
-            {dict.users.deleteUser}
-          </Button>
-        </CardContent>
-      </Card>
+      {canLock && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-destructive">{dict.users.deleteUser}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="destructive"
+              onClick={() => setDeleteOpen(true)}
+              disabled={isPending}
+            >
+              <Trash2Icon className="size-4" data-icon="inline-start" />
+              {dict.users.deleteUser}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Confirm Dialogs */}
       <ConfirmDialog
