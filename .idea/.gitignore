@@ -16,3 +16,4 @@ modules.xml
 go.imports.xml
 swift-toolchain.xml
 vcs.xml
+git_toolbox_prj.xml
