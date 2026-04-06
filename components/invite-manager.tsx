@@ -79,6 +79,7 @@ export function InviteManager({ invites }: InviteManagerProps) {
       } else {
         toast.error(result.error ?? dict.errors.unknown);
       }
+      setDeleteTarget(null);
     });
   }
 
