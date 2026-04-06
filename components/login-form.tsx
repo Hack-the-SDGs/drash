@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 import { loginAction, type LoginState } from "@/lib/actions/auth";
 import {
@@ -44,6 +44,13 @@ export function LoginForm({
     loginAction,
     null,
   );
+
+  // Full page navigation so password managers detect the successful login
+  useEffect(() => {
+    if (state?.success && state.redirectTo) {
+      window.location.href = state.redirectTo;
+    }
+  }, [state]);
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">

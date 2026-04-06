@@ -7,6 +7,7 @@ import { DraslAPIError } from "@/lib/drasl/client";
 export type LoginState = {
   success: boolean;
   error?: string;
+  redirectTo?: string;
 } | null;
 
 export async function loginAction(
@@ -24,11 +25,12 @@ export async function loginAction(
   try {
     const user = await login({ username, password });
 
-    if (user.role === "root" || user.role === "admin") {
-      redirect(`/${lang}/admin/users`);
-    } else {
-      redirect(`/${lang}/profile`);
-    }
+    const redirectTo =
+      user.role === "root" || user.role === "admin"
+        ? `/${lang}/admin/users`
+        : `/${lang}/profile`;
+
+    return { success: true, redirectTo };
   } catch (e) {
     if (e instanceof DraslAPIError) {
       return { success: false, error: e.message };
