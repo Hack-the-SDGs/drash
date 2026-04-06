@@ -10,11 +10,17 @@ import type {
 } from "@/lib/types";
 
 export function getUsers() {
-  return draslFetch<APIUser[]>("/users");
+  return draslFetch<APIUser[]>("/users", {
+    tags: ["users"],
+    revalidate: 30,
+  });
 }
 
 export function getUser(uuid: string) {
-  return draslFetch<APIUser>(`/users/${uuid}`);
+  return draslFetch<APIUser>(`/users/${uuid}`, {
+    tags: ["users", `user-${uuid}`],
+    revalidate: 30,
+  });
 }
 
 export function createUser(data: APICreateUserRequest) {

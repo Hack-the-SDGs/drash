@@ -30,6 +30,7 @@ export default async function EditUserPage(
         <Button
           variant="ghost"
           size="icon"
+          nativeButton={false}
           render={<Link href={`/${lang}/admin/users`} />}
         >
           <ArrowLeftIcon className="size-4" />

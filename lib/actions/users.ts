@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { updateTag } from "next/cache";
 import {
   createUser,
   updateUser,
@@ -78,7 +78,7 @@ export async function createUserAction(formData: FormData) {
 
   try {
     await createUser(data);
-    revalidatePath("/[lang]/admin/users", "page");
+    updateTag("users");
     return { success: true };
   } catch (e) {
     if (e instanceof DraslAPIError) {
@@ -116,7 +116,7 @@ export async function updateUserAction(uuid: string, formData: FormData) {
 
   try {
     await updateUser(uuid, data);
-    revalidatePath("/[lang]/admin/users", "page");
+    updateTag("users");
     return { success: true };
   } catch (e) {
     if (e instanceof DraslAPIError) {
@@ -129,7 +129,7 @@ export async function updateUserAction(uuid: string, formData: FormData) {
 export async function deleteUserAction(uuid: string) {
   try {
     await deleteUser(uuid);
-    revalidatePath("/[lang]/admin/users", "page");
+    updateTag("users");
     return { success: true };
   } catch (e) {
     if (e instanceof DraslAPIError) {
@@ -142,7 +142,7 @@ export async function deleteUserAction(uuid: string) {
 export async function lockUserAction(uuid: string) {
   try {
     await updateUser(uuid, { isLocked: true });
-    revalidatePath("/[lang]/admin/users", "page");
+    updateTag("users");
     return { success: true };
   } catch (e) {
     if (e instanceof DraslAPIError) {
@@ -155,7 +155,7 @@ export async function lockUserAction(uuid: string) {
 export async function unlockUserAction(uuid: string) {
   try {
     await updateUser(uuid, { isLocked: false });
-    revalidatePath("/[lang]/admin/users", "page");
+    updateTag("users");
     return { success: true };
   } catch (e) {
     if (e instanceof DraslAPIError) {
@@ -168,7 +168,7 @@ export async function unlockUserAction(uuid: string) {
 export async function resetApiTokenAction(uuid: string) {
   try {
     await updateUser(uuid, { resetApiToken: true });
-    revalidatePath("/[lang]/admin/users", "page");
+    updateTag("users");
     return { success: true };
   } catch (e) {
     if (e instanceof DraslAPIError) {
@@ -181,7 +181,7 @@ export async function resetApiTokenAction(uuid: string) {
 export async function resetMinecraftTokenAction(uuid: string) {
   try {
     await updateUser(uuid, { resetMinecraftToken: true });
-    revalidatePath("/[lang]/admin/users", "page");
+    updateTag("users");
     return { success: true };
   } catch (e) {
     if (e instanceof DraslAPIError) {
@@ -201,7 +201,7 @@ export async function createUserOIDCAction(uuid: string, formData: FormData) {
 
   try {
     await createUserOIDC(uuid, { issuer, subject });
-    revalidatePath("/[lang]/admin/users", "page");
+    updateTag("users");
     return { success: true };
   } catch (e) {
     if (e instanceof DraslAPIError) {
@@ -220,7 +220,7 @@ export async function deleteUserOIDCAction(uuid: string, formData: FormData) {
 
   try {
     await deleteUserOIDC(uuid, { issuer });
-    revalidatePath("/[lang]/admin/users", "page");
+    updateTag("users");
     return { success: true };
   } catch (e) {
     if (e instanceof DraslAPIError) {
@@ -233,7 +233,7 @@ export async function deleteUserOIDCAction(uuid: string, formData: FormData) {
 export async function setAdminAction(uuid: string, isAdmin: boolean) {
   try {
     await updateUser(uuid, { isAdmin });
-    revalidatePath("/[lang]/admin/users", "page");
+    updateTag("users");
     return { success: true };
   } catch (e) {
     if (e instanceof DraslAPIError) {

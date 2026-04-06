@@ -1,13 +1,13 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { updateTag } from "next/cache";
 import { createInvite, deleteInvite } from "@/lib/drasl/invites";
 import { DraslAPIError } from "@/lib/drasl/client";
 
 export async function createInviteAction() {
   try {
     await createInvite();
-    revalidatePath("/[lang]/admin/invites", "page");
+    updateTag("invites");
     return { success: true };
   } catch (e) {
     if (e instanceof DraslAPIError) {
@@ -24,7 +24,7 @@ export async function deleteInviteAction(code: string) {
 
   try {
     await deleteInvite(code);
-    revalidatePath("/[lang]/admin/invites", "page");
+    updateTag("invites");
     return { success: true };
   } catch (e) {
     if (e instanceof DraslAPIError) {

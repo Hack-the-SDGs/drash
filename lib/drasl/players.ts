@@ -7,11 +7,17 @@ import type {
 } from "@/lib/types";
 
 export function getPlayers() {
-  return draslFetch<APIPlayer[]>("/players");
+  return draslFetch<APIPlayer[]>("/players", {
+    tags: ["players"],
+    revalidate: 30,
+  });
 }
 
 export function getPlayer(uuid: string) {
-  return draslFetch<APIPlayer>(`/players/${uuid}`);
+  return draslFetch<APIPlayer>(`/players/${uuid}`, {
+    tags: ["players", `player-${uuid}`],
+    revalidate: 30,
+  });
 }
 
 export function createPlayer(data: APICreatePlayerRequest) {

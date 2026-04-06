@@ -20,25 +20,37 @@ async function getToken(): Promise<string | undefined> {
   return cookieStore.get("drasl_token")?.value;
 }
 
+interface DraslFetchOptions extends RequestInit {
+  tags?: string[];
+  revalidate?: number;
+}
+
 export async function draslFetch<T>(
   path: string,
-  options: RequestInit = {},
+  options: DraslFetchOptions = {},
 ): Promise<T> {
   const token = await getToken();
+  const { tags, revalidate, ...fetchOptions } = options;
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...(options.headers as Record<string, string>),
+    ...(fetchOptions.headers as Record<string, string>),
   };
 
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
+  const nextOptions: Record<string, unknown> = {};
+  if (tags) nextOptions.tags = tags;
+  if (revalidate !== undefined) nextOptions.revalidate = revalidate;
+
   const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
+    ...fetchOptions,
     headers,
-    cache: "no-store",
+    ...(tags || revalidate !== undefined
+      ? { next: nextOptions }
+      : { cache: "no-store" }),
   });
 
   if (res.status === 401) {

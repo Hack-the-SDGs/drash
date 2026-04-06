@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { updateTag } from "next/cache";
 import { createPlayer, updatePlayer, deletePlayer } from "@/lib/drasl/players";
 import { DraslAPIError } from "@/lib/drasl/client";
 import type {
@@ -57,7 +57,8 @@ export async function createPlayerAction(formData: FormData) {
 
   try {
     await createPlayer(data);
-    revalidatePath("/[lang]/admin/players", "page");
+    updateTag("players");
+    updateTag("users");
     return { success: true };
   } catch (e) {
     if (e instanceof DraslAPIError) {
@@ -107,7 +108,8 @@ export async function updatePlayerAction(uuid: string, formData: FormData) {
 
   try {
     await updatePlayer(uuid, data);
-    revalidatePath("/[lang]/admin/players", "page");
+    updateTag("players");
+    updateTag("users");
     return { success: true };
   } catch (e) {
     if (e instanceof DraslAPIError) {
@@ -120,7 +122,8 @@ export async function updatePlayerAction(uuid: string, formData: FormData) {
 export async function deletePlayerAction(uuid: string) {
   try {
     await deletePlayer(uuid);
-    revalidatePath("/[lang]/admin/players", "page");
+    updateTag("players");
+    updateTag("users");
     return { success: true };
   } catch (e) {
     if (e instanceof DraslAPIError) {

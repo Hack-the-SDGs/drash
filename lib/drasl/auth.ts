@@ -67,5 +67,8 @@ export async function getSession(): Promise<SessionUser | null> {
 }
 
 export async function getCurrentUser(): Promise<APIUser> {
-  return draslFetch<APIUser>("/user");
+  return draslFetch<APIUser>("/user", {
+    tags: ["current-user"],
+    revalidate: 30,
+  });
 }
