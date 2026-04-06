@@ -69,6 +69,7 @@ export function PlayerTable({ players, userMap, users, lang }: PlayerTableProps)
       } else {
         toast.error(result.error ?? dict.errors.unknown);
       }
+      setDeleteTarget(null);
     });
   }
 
