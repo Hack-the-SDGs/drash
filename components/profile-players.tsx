@@ -60,7 +60,7 @@ export function ProfilePlayers({
           <Badge variant="secondary">
             {dict.common.total.replace("{count}", String(players.length))}
           </Badge>
-          {isStaff && (
+          {(isStaff || userRole === "admin" || userRole === "root") && (
             <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
               <PlusIcon className="size-4" data-icon="inline-start" />
               {dict.profile.createPlayer}
@@ -121,7 +121,7 @@ export function ProfilePlayers({
         )}
       </div>
 
-      {isStaff && (
+      {(isStaff || userRole === "admin" || userRole === "root") && (
         <>
           <CreatePlayerDialog open={createOpen} onOpenChange={setCreateOpen} userUuid={userUuid} isStaffMode />
           <ConfirmDialog
