@@ -25,7 +25,7 @@ function getSessionUser(request: NextRequest) {
   }
 }
 
-export function proxy(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Skip internal paths
