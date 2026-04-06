@@ -132,11 +132,10 @@ export function AdminPlayerEditor({
 
       {/* Skin Editor */}
       <SkinEditor
-        playerUuid={player.uuid}
-        currentSkinUrl={player.skinUrl || undefined}
-        currentCapeUrl={player.capeUrl || undefined}
-        currentSkinModel={player.skinModel}
-        dict={{ player: dict.player }}
+        player={player}
+        dict={dict.player}
+        commonDict={dict.common}
+        lang={lang}
       />
 
       <ConfirmDialog
