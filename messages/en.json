@@ -102,7 +102,11 @@
     "orEnterUuid": "Or enter UUID directly",
     "mojangNotFound": "Player not found on Mojang",
     "mojangFound": "Found: {name}",
-    "selectOwner": "Select Owner"
+    "selectOwner": "Select Owner",
+    "selected": "{count} selected",
+    "batchDelete": "Delete",
+    "batchDeleteConfirm": "Are you sure you want to delete {count} players? This cannot be undone.",
+    "batchDeleted": "{success} deleted, {failed} failed"
   },
   "users": {
     "title": "Users",
@@ -159,7 +163,15 @@
     "cannotLockHigherRole": "Cannot lock users of equal or higher role",
     "cannotDeleteSameNamePlayer": "Cannot delete the player with the same name as the user",
     "resetOwnTokenWarning": "Resetting your own API token will log you out. You will need to sign in again.",
-    "resetTokenConfirm": "Are you sure you want to reset this token?"
+    "resetTokenConfirm": "Are you sure you want to reset this token?",
+    "selected": "{count} selected",
+    "batchLock": "Lock",
+    "batchUnlock": "Unlock",
+    "batchDelete": "Delete",
+    "batchDeleteConfirm": "Are you sure you want to delete {count} users? This cannot be undone.",
+    "batchLocked": "{success} locked, {failed} failed",
+    "batchUnlocked": "{success} unlocked, {failed} failed",
+    "batchDeleted": "{success} deleted, {failed} failed"
   },
   "invites": {
     "title": "Invites",

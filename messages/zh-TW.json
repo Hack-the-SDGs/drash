@@ -102,7 +102,11 @@
     "orEnterUuid": "或直接輸入 UUID",
     "mojangNotFound": "在 Mojang 找不到此玩家",
     "mojangFound": "找到：{name}",
-    "selectOwner": "選擇所屬使用者"
+    "selectOwner": "選擇所屬使用者",
+    "selected": "已選取 {count} 項",
+    "batchDelete": "刪除",
+    "batchDeleteConfirm": "確定要刪除 {count} 位玩家嗎？此操作無法復原。",
+    "batchDeleted": "刪除 {success} 筆，失敗 {failed} 筆"
   },
   "users": {
     "title": "使用者管理",
@@ -159,7 +163,15 @@
     "cannotLockHigherRole": "無法鎖定同級或更高權限的使用者",
     "cannotDeleteSameNamePlayer": "無法刪除與使用者同名的玩家",
     "resetOwnTokenWarning": "重設自己的 API Token 後將會登出，需要重新登入。",
-    "resetTokenConfirm": "確定要重設此 Token 嗎？"
+    "resetTokenConfirm": "確定要重設此 Token 嗎？",
+    "selected": "已選取 {count} 項",
+    "batchLock": "鎖定",
+    "batchUnlock": "解鎖",
+    "batchDelete": "刪除",
+    "batchDeleteConfirm": "確定要刪除 {count} 位使用者嗎？此操作無法復原。",
+    "batchLocked": "鎖定 {success} 筆，失敗 {failed} 筆",
+    "batchUnlocked": "解鎖 {success} 筆，失敗 {failed} 筆",
+    "batchDeleted": "刪除 {success} 筆，失敗 {failed} 筆"
   },
   "invites": {
     "title": "邀請碼管理",
