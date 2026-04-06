@@ -7,6 +7,7 @@ import { useDict } from "@/components/dict-provider";
 import { updatePlayerAction, deletePlayerAction } from "@/lib/actions/players";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { SkinEditor } from "@/components/skin-editor";
+import { isMojangPlayer } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,6 +65,8 @@ export function AdminPlayerEditor({
       }
     });
   }
+
+  const mojang = isMojangPlayer(player);
 
   return (
     <div className="space-y-6">
@@ -136,6 +139,7 @@ export function AdminPlayerEditor({
         dict={dict.player}
         commonDict={dict.common}
         lang={lang}
+        readonly={mojang}
       />
 
       <ConfirmDialog

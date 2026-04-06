@@ -37,6 +37,7 @@ type PlayerDict = {
   skinSaved: string;
   capeSaved: string;
   saved: string;
+  mojangTextures: string;
 };
 
 type CommonDict = {
@@ -49,11 +50,12 @@ interface SkinEditorProps {
   dict: PlayerDict;
   commonDict: CommonDict;
   lang: string;
+  readonly?: boolean;
 }
 
 type ActionState = { success: boolean; error?: string } | null;
 
-export function SkinEditor({ player, dict, commonDict, lang }: SkinEditorProps) {
+export function SkinEditor({ player, dict, commonDict, lang, readonly }: SkinEditorProps) {
   const [skinModel, setSkinModel] = useState<"classic" | "slim">(player.skinModel);
 
   // Local preview URLs (from file upload, not yet saved)
@@ -172,177 +174,185 @@ export function SkinEditor({ player, dict, commonDict, lang }: SkinEditorProps) 
         </Card>
 
         {/* Editor tabs */}
-        <Tabs defaultValue="skin">
-          <TabsList>
-            <TabsTrigger value="skin">{dict.skin}</TabsTrigger>
-            <TabsTrigger value="cape">{dict.cape}</TabsTrigger>
-          </TabsList>
+        {readonly ? (
+          <Card>
+            <CardContent className="flex items-center justify-center p-8">
+              <p className="text-sm text-muted-foreground">{dict.mojangTextures}</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <Tabs defaultValue="skin">
+            <TabsList>
+              <TabsTrigger value="skin">{dict.skin}</TabsTrigger>
+              <TabsTrigger value="cape">{dict.cape}</TabsTrigger>
+            </TabsList>
 
-          {/* Skin tab */}
-          <TabsContent value="skin">
-            <Card>
-              <CardHeader>
-                <CardTitle>{dict.skin}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <form action={skinFormAction} className="space-y-4">
-                  {/* Skin model selector */}
-                  <div className="space-y-1.5">
-                    <Label>{dict.skinModel}</Label>
-                    <Select
-                      value={skinModel}
-                      onValueChange={(v) => setSkinModel(v as "classic" | "slim")}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="classic">{dict.classic}</SelectItem>
-                        <SelectItem value="slim">{dict.slim}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <input type="hidden" name="skinModel" value={skinModel} />
-                  </div>
-
-                  {/* Upload skin file */}
-                  <div className="space-y-1.5">
-                    <Label htmlFor="skinFile">{dict.uploadSkin}</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        ref={skinFileRef}
-                        id="skinFile"
-                        name="skinFile"
-                        type="file"
-                        accept="image/png"
-                        onChange={handleSkinFileChange}
-                      />
-                      <UploadIcon className="size-4 shrink-0 text-muted-foreground" />
+            {/* Skin tab */}
+            <TabsContent value="skin">
+              <Card>
+                <CardHeader>
+                  <CardTitle>{dict.skin}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form action={skinFormAction} className="space-y-4">
+                    {/* Skin model selector */}
+                    <div className="space-y-1.5">
+                      <Label>{dict.skinModel}</Label>
+                      <Select
+                        value={skinModel}
+                        onValueChange={(v) => setSkinModel(v as "classic" | "slim")}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="classic">{dict.classic}</SelectItem>
+                          <SelectItem value="slim">{dict.slim}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <input type="hidden" name="skinModel" value={skinModel} />
                     </div>
-                  </div>
 
-                  {/* OR: skin URL */}
-                  <div className="space-y-1.5">
-                    <Label htmlFor="skinUrl">{dict.skinUrl}</Label>
-                    <Input
-                      id="skinUrl"
-                      name="skinUrl"
-                      type="url"
-                      placeholder="https://..."
-                      value={skinUrlInput}
-                      onChange={(e) => {
-                        setSkinUrlInput(e.target.value);
-                        if (e.target.value) {
-                          setLocalSkinUrl(null);
-                          if (skinFileRef.current) skinFileRef.current.value = "";
-                        }
-                      }}
-                    />
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 pt-2">
-                    <Button type="submit" disabled={skinPending}>
-                      <SaveIcon className="size-4" />
-                      {commonDict.save}
-                    </Button>
-                    <Button
-                      type="submit"
-                      variant="destructive"
-                      disabled={skinPending}
-                      onClick={() => {
-                        // Inject deleteSkin hidden field before submit
-                        const form = skinFileRef.current?.closest("form");
-                        if (form) {
-                          const hidden = document.createElement("input");
-                          hidden.type = "hidden";
-                          hidden.name = "deleteSkin";
-                          hidden.value = "true";
-                          form.appendChild(hidden);
-                        }
-                      }}
-                    >
-                      <Trash2Icon className="size-4" />
-                      {dict.deleteSkin}
-                    </Button>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Cape tab */}
-          <TabsContent value="cape">
-            <Card>
-              <CardHeader>
-                <CardTitle>{dict.cape}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <form action={capeFormAction} className="space-y-4">
-                  {/* Upload cape file */}
-                  <div className="space-y-1.5">
-                    <Label htmlFor="capeFile">{dict.uploadCape}</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        ref={capeFileRef}
-                        id="capeFile"
-                        name="capeFile"
-                        type="file"
-                        accept="image/png"
-                        onChange={handleCapeFileChange}
-                      />
-                      <UploadIcon className="size-4 shrink-0 text-muted-foreground" />
+                    {/* Upload skin file */}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="skinFile">{dict.uploadSkin}</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          ref={skinFileRef}
+                          id="skinFile"
+                          name="skinFile"
+                          type="file"
+                          accept="image/png"
+                          onChange={handleSkinFileChange}
+                        />
+                        <UploadIcon className="size-4 shrink-0 text-muted-foreground" />
+                      </div>
                     </div>
-                  </div>
 
-                  {/* OR: cape URL */}
-                  <div className="space-y-1.5">
-                    <Label htmlFor="capeUrl">{dict.capeUrl}</Label>
-                    <Input
-                      id="capeUrl"
-                      name="capeUrl"
-                      type="url"
-                      placeholder="https://..."
-                      value={capeUrlInput}
-                      onChange={(e) => {
-                        setCapeUrlInput(e.target.value);
-                        if (e.target.value) {
-                          setLocalCapeUrl(null);
-                          if (capeFileRef.current) capeFileRef.current.value = "";
-                        }
-                      }}
-                    />
-                  </div>
+                    {/* OR: skin URL */}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="skinUrl">{dict.skinUrl}</Label>
+                      <Input
+                        id="skinUrl"
+                        name="skinUrl"
+                        type="url"
+                        placeholder="https://..."
+                        value={skinUrlInput}
+                        onChange={(e) => {
+                          setSkinUrlInput(e.target.value);
+                          if (e.target.value) {
+                            setLocalSkinUrl(null);
+                            if (skinFileRef.current) skinFileRef.current.value = "";
+                          }
+                        }}
+                      />
+                    </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 pt-2">
-                    <Button type="submit" disabled={capePending}>
-                      <SaveIcon className="size-4" />
-                      {commonDict.save}
-                    </Button>
-                    <Button
-                      type="submit"
-                      variant="destructive"
-                      disabled={capePending}
-                      onClick={() => {
-                        const form = capeFileRef.current?.closest("form");
-                        if (form) {
-                          const hidden = document.createElement("input");
-                          hidden.type = "hidden";
-                          hidden.name = "deleteCape";
-                          hidden.value = "true";
-                          form.appendChild(hidden);
-                        }
-                      }}
-                    >
-                      <Trash2Icon className="size-4" />
-                      {dict.deleteCape}
-                    </Button>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 pt-2">
+                      <Button type="submit" disabled={skinPending}>
+                        <SaveIcon className="size-4" />
+                        {commonDict.save}
+                      </Button>
+                      <Button
+                        type="submit"
+                        variant="destructive"
+                        disabled={skinPending}
+                        onClick={() => {
+                          // Inject deleteSkin hidden field before submit
+                          const form = skinFileRef.current?.closest("form");
+                          if (form) {
+                            const hidden = document.createElement("input");
+                            hidden.type = "hidden";
+                            hidden.name = "deleteSkin";
+                            hidden.value = "true";
+                            form.appendChild(hidden);
+                          }
+                        }}
+                      >
+                        <Trash2Icon className="size-4" />
+                        {dict.deleteSkin}
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Cape tab */}
+            <TabsContent value="cape">
+              <Card>
+                <CardHeader>
+                  <CardTitle>{dict.cape}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form action={capeFormAction} className="space-y-4">
+                    {/* Upload cape file */}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="capeFile">{dict.uploadCape}</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          ref={capeFileRef}
+                          id="capeFile"
+                          name="capeFile"
+                          type="file"
+                          accept="image/png"
+                          onChange={handleCapeFileChange}
+                        />
+                        <UploadIcon className="size-4 shrink-0 text-muted-foreground" />
+                      </div>
+                    </div>
+
+                    {/* OR: cape URL */}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="capeUrl">{dict.capeUrl}</Label>
+                      <Input
+                        id="capeUrl"
+                        name="capeUrl"
+                        type="url"
+                        placeholder="https://..."
+                        value={capeUrlInput}
+                        onChange={(e) => {
+                          setCapeUrlInput(e.target.value);
+                          if (e.target.value) {
+                            setLocalCapeUrl(null);
+                            if (capeFileRef.current) capeFileRef.current.value = "";
+                          }
+                        }}
+                      />
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 pt-2">
+                      <Button type="submit" disabled={capePending}>
+                        <SaveIcon className="size-4" />
+                        {commonDict.save}
+                      </Button>
+                      <Button
+                        type="submit"
+                        variant="destructive"
+                        disabled={capePending}
+                        onClick={() => {
+                          const form = capeFileRef.current?.closest("form");
+                          if (form) {
+                            const hidden = document.createElement("input");
+                            hidden.type = "hidden";
+                            hidden.name = "deleteCape";
+                            hidden.value = "true";
+                            form.appendChild(hidden);
+                          }
+                        }}
+                      >
+                        <Trash2Icon className="size-4" />
+                        {dict.deleteCape}
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        )}
       </div>
     </div>
   );
