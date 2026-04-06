@@ -157,7 +157,9 @@
     "batchResult": "{success} succeeded, {failed} failed",
     "retryFailed": "Retry Failed",
     "cannotLockHigherRole": "Cannot lock users of equal or higher role",
-    "cannotDeleteSameNamePlayer": "Cannot delete the player with the same name as the user"
+    "cannotDeleteSameNamePlayer": "Cannot delete the player with the same name as the user",
+    "resetOwnTokenWarning": "Resetting your own API token will log you out. You will need to sign in again.",
+    "resetTokenConfirm": "Are you sure you want to reset this token?"
   },
   "invites": {
     "title": "Invites",

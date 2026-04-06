@@ -127,11 +127,18 @@ export function EditUserForm({ user, lang, viewerRole, viewerUsername, targetRol
     });
   }
 
+  const isSelf = viewerUsername === user.username;
+
   // -- Token resets --
   function handleResetApiToken() {
     startTransition(async () => {
       const result = await resetApiTokenAction(user.uuid);
       if (result.success) {
+        if (isSelf) {
+          // Own API token was reset — session is now invalid, redirect to login
+          window.location.href = `/${lang}/login`;
+          return;
+        }
         toast.success(dict.users.updated);
       } else {
         toast.error(result.error);
@@ -509,9 +516,14 @@ export function EditUserForm({ user, lang, viewerRole, viewerUsername, targetRol
         open={resetApiOpen}
         onOpenChange={setResetApiOpen}
         title={dict.users.resetApiToken}
-        description={dict.users.resetApiToken + "?"}
+        description={
+          isSelf
+            ? dict.users.resetOwnTokenWarning
+            : dict.users.resetTokenConfirm
+        }
         confirmLabel={dict.common.confirm}
         cancelLabel={dict.common.cancel}
+        destructive={isSelf}
         onConfirm={handleResetApiToken}
         pending={isPending}
       />
@@ -520,7 +532,7 @@ export function EditUserForm({ user, lang, viewerRole, viewerUsername, targetRol
         open={resetMcOpen}
         onOpenChange={setResetMcOpen}
         title={dict.users.resetMinecraftToken}
-        description={dict.users.resetMinecraftToken + "?"}
+        description={dict.users.resetTokenConfirm}
         confirmLabel={dict.common.confirm}
         cancelLabel={dict.common.cancel}
         onConfirm={handleResetMinecraftToken}

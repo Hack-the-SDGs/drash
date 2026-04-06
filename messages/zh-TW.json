@@ -157,7 +157,9 @@
     "batchResult": "成功 {success} 筆，失敗 {failed} 筆",
     "retryFailed": "重試失敗項目",
     "cannotLockHigherRole": "無法鎖定同級或更高權限的使用者",
-    "cannotDeleteSameNamePlayer": "無法刪除與使用者同名的玩家"
+    "cannotDeleteSameNamePlayer": "無法刪除與使用者同名的玩家",
+    "resetOwnTokenWarning": "重設自己的 API Token 後將會登出，需要重新登入。",
+    "resetTokenConfirm": "確定要重設此 Token 嗎？"
   },
   "invites": {
     "title": "邀請碼管理",
