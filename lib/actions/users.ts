@@ -180,9 +180,9 @@ export async function unlockUserAction(uuid: string) {
 
 export async function resetApiTokenAction(uuid: string) {
   try {
-    await updateUser(uuid, { resetApiToken: true });
+    const user = await updateUser(uuid, { resetApiToken: true });
     updateTag("users");
-    return { success: true };
+    return { success: true, token: user.apiToken };
   } catch (e) {
     if (e instanceof DraslAPIError) {
       return { success: false, error: e.message };
@@ -193,9 +193,9 @@ export async function resetApiTokenAction(uuid: string) {
 
 export async function resetMinecraftTokenAction(uuid: string) {
   try {
-    await updateUser(uuid, { resetMinecraftToken: true });
+    const user = await updateUser(uuid, { resetMinecraftToken: true });
     updateTag("users");
-    return { success: true };
+    return { success: true, token: user.minecraftToken };
   } catch (e) {
     if (e instanceof DraslAPIError) {
       return { success: false, error: e.message };

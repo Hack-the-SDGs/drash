@@ -7,6 +7,8 @@ export interface APIUser {
   isLocked: boolean;
   maxPlayerCount: number;
   preferredLanguage: string;
+  apiToken: string;
+  minecraftToken: string;
   players: APIPlayer[];
   oidcIdentities: APIOIDCIdentity[];
 }

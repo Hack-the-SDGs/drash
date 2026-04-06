@@ -152,6 +152,22 @@ export function EditUserForm({ user, lang, viewerRole, viewerUsername, targetRol
     });
   }
 
+  function TokenField({ label, value }: { label: string; value: string }) {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <Label>{label}</Label>
+        <div className="flex gap-2">
+          <Input value={value || "-"} disabled className="font-mono text-xs" />
+          {value && (
+            <Button type="button" variant="outline" size="icon" onClick={() => copyToClipboard(value)}>
+              <CopyIcon className="size-4" />
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // -- Delete --
   function handleDelete() {
     startTransition(async () => {
@@ -282,7 +298,7 @@ export function EditUserForm({ user, lang, viewerRole, viewerUsername, targetRol
                   id="maxPlayerCount"
                   name="maxPlayerCount"
                   type="number"
-                  min={0}
+                  min={-2}
                   defaultValue={user.maxPlayerCount}
                 />
               </div>
@@ -331,23 +347,29 @@ export function EditUserForm({ user, lang, viewerRole, viewerUsername, targetRol
         <CardHeader>
           <CardTitle>Tokens</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setResetApiOpen(true)}
-            disabled={isPending}
-          >
-            <KeyIcon className="size-4" data-icon="inline-start" />
-            {dict.users.resetApiToken}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setResetMcOpen(true)}
-            disabled={isPending}
-          >
-            <KeyIcon className="size-4" data-icon="inline-start" />
-            {dict.users.resetMinecraftToken}
-          </Button>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TokenField label="API Token" value={user.apiToken} />
+            <TokenField label="Minecraft Token" value={user.minecraftToken} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setResetApiOpen(true)}
+              disabled={isPending}
+            >
+              <KeyIcon className="size-4" data-icon="inline-start" />
+              {dict.users.resetApiToken}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setResetMcOpen(true)}
+              disabled={isPending}
+            >
+              <KeyIcon className="size-4" data-icon="inline-start" />
+              {dict.users.resetMinecraftToken}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

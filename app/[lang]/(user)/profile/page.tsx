@@ -18,6 +18,7 @@ import {
   ShieldCheckIcon,
   LockIcon,
   SettingsIcon,
+  CopyIcon,
 } from "lucide-react";
 import { isStaff as checkIsStaff } from "@/lib/permissions";
 import { ProfilePlayers } from "@/components/profile-players";
@@ -142,7 +143,7 @@ export default async function ProfilePage(
             <div>
               <p className="text-xs text-muted-foreground">{dict.profile.playerLimit}</p>
               <p className="text-sm font-medium">
-                {user.maxPlayerCount === -1
+                {user.maxPlayerCount < 0
                   ? dict.profile.unlimited
                   : dict.profile.playerCount
                       .replace("{current}", String(user.players.length))
@@ -154,6 +155,31 @@ export default async function ProfilePage(
       </Card>
 
       {staff && <ProfilePassword userUuid={user.uuid} />}
+
+      {/* Tokens */}
+      {(user.apiToken || user.minecraftToken) && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Tokens</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {user.apiToken && (
+                <div>
+                  <p className="text-xs text-muted-foreground">API Token</p>
+                  <p className="truncate font-mono text-xs">{user.apiToken}</p>
+                </div>
+              )}
+              {user.minecraftToken && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Minecraft Token</p>
+                  <p className="truncate font-mono text-xs">{user.minecraftToken}</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* My Players section */}
       <ProfilePlayers
