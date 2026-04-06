@@ -57,7 +57,6 @@ export function CreatePlayerDialog({
   } | null>(null);
   const [mojangError, setMojangError] = useState(false);
   const [isLookingUp, setIsLookingUp] = useState(false);
-  const [directUuid, setDirectUuid] = useState("");
 
   function resetState() {
     setMode("new");
@@ -65,7 +64,6 @@ export function CreatePlayerDialog({
     setMojangUsername("");
     setMojangResult(null);
     setMojangError(false);
-    setDirectUuid("");
     setSelectedUserUuid(userUuid ?? "");
   }
 
@@ -77,7 +75,6 @@ export function CreatePlayerDialog({
     const result = await lookupMojangUuid(mojangUsername.trim());
     if (result) {
       setMojangResult(result);
-      setDirectUuid(result.uuid);
     } else {
       setMojangError(true);
     }
@@ -90,11 +87,10 @@ export function CreatePlayerDialog({
     if (skinModel) formData.set("skinModel", skinModel);
 
     if (mode === "existing") {
-      const uuid = directUuid || mojangResult?.uuid;
-      if (uuid) {
-        formData.set("chosenUuid", uuid);
-        formData.set("existingPlayer", "true");
-      }
+      // Use the looked-up name or the manually entered username as the player name
+      const playerName = mojangResult?.name || mojangUsername.trim();
+      if (playerName) formData.set("name", playerName);
+      formData.set("existingPlayer", "true");
     }
 
     startTransition(async () => {
@@ -166,14 +162,14 @@ export function CreatePlayerDialog({
             </div>
           )}
 
-          {/* Player name */}
-          <div className="space-y-1.5">
-            <Label htmlFor="create-player-name">{dict.player.name}</Label>
-            <Input id="create-player-name" name="name" required />
-          </div>
-
           {mode === "new" ? (
             <>
+              {/* Player name */}
+              <div className="space-y-1.5">
+                <Label htmlFor="create-player-name">{dict.player.name}</Label>
+                <Input id="create-player-name" name="name" required />
+              </div>
+
               {/* Skin model */}
               <div className="space-y-1.5">
                 <Label>{dict.player.skinModel}</Label>
@@ -253,16 +249,6 @@ export function CreatePlayerDialog({
                   </p>
                 )}
               </div>
-
-              {/* Direct UUID input */}
-              <div className="space-y-1.5">
-                <Label>{dict.player.orEnterUuid}</Label>
-                <Input
-                  value={directUuid}
-                  onChange={(e) => setDirectUuid(e.target.value)}
-                  placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                />
-              </div>
             </>
           )}
 
@@ -281,7 +267,8 @@ export function CreatePlayerDialog({
               type="submit"
               disabled={
                 isPending ||
-                (needsOwnerSelection && !selectedUserUuid)
+                (needsOwnerSelection && !selectedUserUuid) ||
+                (mode === "existing" && !mojangUsername.trim())
               }
             >
               {isPending ? dict.common.loading : dict.common.create}
