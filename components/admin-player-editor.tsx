@@ -24,12 +24,14 @@ interface AdminPlayerEditorProps {
   player: APIPlayer;
   ownerUsername?: string;
   lang: string;
+  isMojang: boolean;
 }
 
 export function AdminPlayerEditor({
   player,
   ownerUsername,
   lang,
+  isMojang,
 }: AdminPlayerEditorProps) {
   const dict = useDict();
   const router = useRouter();
@@ -136,6 +138,7 @@ export function AdminPlayerEditor({
         dict={dict.player}
         commonDict={dict.common}
         lang={lang}
+        readonly={isMojang}
       />
 
       <ConfirmDialog

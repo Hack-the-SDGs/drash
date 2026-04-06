@@ -6,7 +6,7 @@ interface TextureInfo {
   skinModel?: "classic" | "slim";
 }
 
-interface MojangProfile {
+interface SessionProfile {
   id: string;
   name: string;
   properties: {
@@ -29,11 +29,41 @@ interface TexturesPayload {
   };
 }
 
+/** Decode textures from a session profile's properties. */
+function decodeTextures(profile: SessionProfile): TexturesPayload | null {
+  const prop = profile.properties.find((p) => p.name === "textures");
+  if (!prop) return null;
+  try {
+    return JSON.parse(Buffer.from(prop.value, "base64").toString("utf8"));
+  } catch {
+    return null;
+  }
+}
+
+/** Fetch and decode textures from a session server. */
+async function fetchSessionTextures(
+  baseUrl: string,
+  uuid: string,
+): Promise<TexturesPayload | null> {
+  try {
+    const res = await fetch(
+      `${baseUrl}/session/minecraft/profile/${uuid.replace(/-/g, "")}`,
+      { cache: "force-cache", next: { revalidate: 300, tags: ["textures"] } },
+    );
+    if (!res.ok) return null;
+    const profile: SessionProfile = await res.json();
+    return decodeTextures(profile);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Resolve the actual skin/cape URLs for a player.
  * If the player has skinUrl/capeUrl set directly, use those.
  * Otherwise, query Drasl's session server (which handles Mojang fallback)
- * to get the textures.
+ * to get the textures. If cape is still missing, fall back to Mojang's
+ * session server directly.
  */
 export async function resolvePlayerTextures(player: {
   uuid: string;
@@ -50,59 +80,33 @@ export async function resolvePlayerTextures(player: {
     };
   }
 
-  // Query Drasl's session server for texture data
-  try {
-    const profileUrl = `${DRASL_API_URL}/session/minecraft/profile/${player.uuid.replace(/-/g, "")}`;
-    const res = await fetch(profileUrl, {
-      cache: "force-cache",
-      next: { revalidate: 300, tags: ["textures"] },
-    });
+  // Query Drasl's session server
+  const draslTextures = await fetchSessionTextures(DRASL_API_URL, player.uuid);
 
-    if (!res.ok) {
-      return {
-        skinUrl: player.skinUrl || undefined,
-        capeUrl: player.capeUrl || undefined,
-        skinModel: player.skinModel as "classic" | "slim",
-      };
-    }
+  let skinUrl = player.skinUrl || draslTextures?.textures.SKIN?.url || undefined;
+  let capeUrl = player.capeUrl || draslTextures?.textures.CAPE?.url || undefined;
+  let skinModel =
+    (player.skinModel as "classic" | "slim") ||
+    (draslTextures?.textures.SKIN?.metadata?.model === "slim" ? "slim" : "classic");
 
-    const profile: MojangProfile = await res.json();
-    const texturesProp = profile.properties.find(
-      (p) => p.name === "textures",
+  // If cape (or skin) is still missing, try Mojang's session server as fallback
+  if (!skinUrl || !capeUrl) {
+    const mojangTextures = await fetchSessionTextures(
+      "https://sessionserver.mojang.com",
+      player.uuid,
     );
-
-    if (!texturesProp) {
-      return {
-        skinUrl: player.skinUrl || undefined,
-        capeUrl: player.capeUrl || undefined,
-        skinModel: player.skinModel as "classic" | "slim",
-      };
+    if (mojangTextures) {
+      if (!skinUrl) {
+        skinUrl = mojangTextures.textures.SKIN?.url || undefined;
+        if (!skinModel && mojangTextures.textures.SKIN?.metadata?.model === "slim") {
+          skinModel = "slim";
+        }
+      }
+      if (!capeUrl) {
+        capeUrl = mojangTextures.textures.CAPE?.url || undefined;
+      }
     }
-
-    const decoded: TexturesPayload = JSON.parse(
-      atob(texturesProp.value),
-    );
-
-    const resolvedSkinUrl =
-      player.skinUrl || decoded.textures.SKIN?.url || undefined;
-    const resolvedCapeUrl =
-      player.capeUrl || decoded.textures.CAPE?.url || undefined;
-    const resolvedModel =
-      (player.skinModel as "classic" | "slim") ||
-      (decoded.textures.SKIN?.metadata?.model === "slim"
-        ? "slim"
-        : "classic");
-
-    return {
-      skinUrl: resolvedSkinUrl,
-      capeUrl: resolvedCapeUrl,
-      skinModel: resolvedModel,
-    };
-  } catch {
-    return {
-      skinUrl: player.skinUrl || undefined,
-      capeUrl: player.capeUrl || undefined,
-      skinModel: player.skinModel as "classic" | "slim",
-    };
   }
+
+  return { skinUrl, capeUrl, skinModel };
 }

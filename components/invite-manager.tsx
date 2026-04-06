@@ -18,7 +18,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PlusIcon, Trash2Icon, CopyIcon, CheckIcon } from "lucide-react";
+import { PlusIcon, Trash2Icon, CopyIcon, CheckIcon, ArrowUpIcon, ArrowDownIcon } from "lucide-react";
+import { useSortable } from "@/hooks/use-sortable";
 import type { APIInvite } from "@/lib/types";
 
 interface InviteManagerProps {
@@ -50,6 +51,15 @@ export function InviteManager({ invites }: InviteManagerProps) {
   const [isPending, startTransition] = useTransition();
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
+  const { sorted, sortKey, direction, toggleSort } = useSortable(invites, {
+    defaultKey: "createdAt",
+    defaultDirection: "desc",
+    sortFns: {
+      code: (a, b) => a.code.localeCompare(b.code),
+      createdAt: (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    },
+  });
+
   function handleCreate() {
     startTransition(async () => {
       const result = await createInviteAction();
@@ -69,6 +79,7 @@ export function InviteManager({ invites }: InviteManagerProps) {
       } else {
         toast.error(result.error ?? dict.errors.unknown);
       }
+      setDeleteTarget(null);
     });
   }
 
@@ -96,21 +107,31 @@ export function InviteManager({ invites }: InviteManagerProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>{dict.invites.code}</TableHead>
-              <TableHead>{dict.invites.createdAt}</TableHead>
+              <TableHead>
+                <button className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("code")}>
+                  {dict.invites.code}
+                  {sortKey === "code" && (direction === "asc" ? <ArrowUpIcon className="size-3" /> : <ArrowDownIcon className="size-3" />)}
+                </button>
+              </TableHead>
+              <TableHead>
+                <button className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("createdAt")}>
+                  {dict.invites.createdAt}
+                  {sortKey === "createdAt" && (direction === "asc" ? <ArrowUpIcon className="size-3" /> : <ArrowDownIcon className="size-3" />)}
+                </button>
+              </TableHead>
               <TableHead>{dict.invites.link}</TableHead>
               <TableHead>{dict.common.actions}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {invites.length === 0 ? (
+            {sorted.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={4} className="text-center text-muted-foreground">
                   {dict.common.noData}
                 </TableCell>
               </TableRow>
             ) : (
-              invites.map((invite) => {
+              sorted.map((invite) => {
                 const isCopied = copiedCode === invite.code;
 
                 return (

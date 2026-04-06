@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { getCurrentUser } from "@/lib/drasl/auth";
+import { getCurrentUser, scrapeUserTokens } from "@/lib/drasl/auth";
+import { DraslAPIError } from "@/lib/drasl/client";
 import { getRole } from "@/lib/drasl/auth";
 import { resolvePlayerTextures } from "@/lib/drasl/textures";
+import { checkMojangUuid } from "@/lib/mojang";
 import { getDictionary, hasLocale, type Locale } from "@/lib/dictionaries";
 import {
   Card,
@@ -12,26 +13,14 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
-  PencilIcon,
   UserIcon,
-  ShieldCheckIcon,
   LockIcon,
-  SettingsIcon,
 } from "lucide-react";
-import { PlayerHead } from "@/components/player-head";
-
-function formatRelativeTime(dateStr: string, lang: string): string {
-  if (!dateStr) return "-";
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString(lang === "zh-TW" ? "zh-TW" : "en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
+import { isStaff as checkIsStaff } from "@/lib/permissions";
+import { ProfilePlayers } from "@/components/profile-players";
+import { ProfilePassword } from "@/components/profile-password";
+import { ProfileTokens } from "@/components/profile-tokens";
 
 export default async function ProfilePage(
   props: { params: Promise<{ lang: string }> },
@@ -47,19 +36,26 @@ export default async function ProfilePage(
   let user;
   try {
     user = await getCurrentUser();
-  } catch {
-    redirect(`/${lang}/login`);
+  } catch (e) {
+    if (e instanceof DraslAPIError) redirect(`/${lang}/login`);
+    throw e;
   }
 
-  // Resolve textures for all players (handles Mojang fallback)
+  // Resolve textures and Mojang status for all players
   const playersWithTextures = await Promise.all(
     user.players.map(async (player) => {
-      const textures = await resolvePlayerTextures(player);
-      return { ...player, ...textures };
+      const [textures, isMojang] = await Promise.all([
+        resolvePlayerTextures(player),
+        checkMojangUuid(player.uuid),
+      ]);
+      return { ...player, ...textures, isMojang };
     }),
   );
 
+  const tokens = await scrapeUserTokens(user.uuid);
+
   const role = getRole(user);
+  const staff = checkIsStaff(user);
 
   const roleBadgeVariant = role === "root"
     ? "destructive"
@@ -67,26 +63,12 @@ export default async function ProfilePage(
       ? "default"
       : "secondary";
 
-  const isAdmin = role === "admin" || role === "root";
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{dict.profile.title}</h1>
-          <p className="text-muted-foreground">{dict.profile.description}</p>
-        </div>
-        {isAdmin && (
-          <Button
-            size="sm"
-            variant="outline"
-            nativeButton={false}
-            render={<Link href={`/${lang}/admin/users`} />}
-          >
-            <SettingsIcon className="size-4" data-icon="inline-start" />
-            {dict.common.goToAdmin}
-          </Button>
-        )}
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">{dict.profile.title}</h1>
+        <p className="text-muted-foreground">{dict.profile.description}</p>
       </div>
 
       {/* User info card */}
@@ -124,93 +106,51 @@ export default async function ProfilePage(
               </p>
               <Badge variant={roleBadgeVariant}>{role}</Badge>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {user.isAdmin && (
-                <div>
-                  <p className="text-xs text-muted-foreground">
-                    {dict.profile.isAdmin}
-                  </p>
-                  <Badge variant="default" className="bg-blue-600 hover:bg-blue-600">
-                    <ShieldCheckIcon className="size-3" />
-                    {dict.profile.isAdmin}
-                  </Badge>
-                </div>
-              )}
-              {user.isLocked && (
-                <div>
-                  <p className="text-xs text-muted-foreground">
-                    {dict.profile.isLocked}
-                  </p>
-                  <Badge variant="destructive">
-                    <LockIcon className="size-3" />
-                    {dict.profile.isLocked}
-                  </Badge>
-                </div>
-              )}
+            {user.isLocked && (
+              <div>
+                <p className="text-xs text-muted-foreground">
+                  {dict.profile.isLocked}
+                </p>
+                <Badge variant="destructive">
+                  <LockIcon className="size-3" />
+                  {dict.profile.isLocked}
+                </Badge>
+              </div>
+            )}
+            <div>
+              <p className="text-xs text-muted-foreground">{dict.profile.playerLimit}</p>
+              <p className="text-sm font-medium">
+                {user.maxPlayerCount < 0
+                  ? dict.profile.unlimited
+                  : dict.profile.playerCount
+                      .replace("{current}", String(user.players.length))
+                      .replace("{max}", String(user.maxPlayerCount))}
+              </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
+      {staff && <ProfilePassword userUuid={user.uuid} />}
+
+      {/* Tokens */}
+      {(tokens.apiToken || tokens.minecraftToken) && (
+        <ProfileTokens
+          apiToken={tokens.apiToken || undefined}
+          minecraftToken={tokens.minecraftToken || undefined}
+        />
+      )}
+
       {/* My Players section */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold">{dict.profile.myPlayers}</h2>
-          <Badge variant="secondary">
-            {dict.common.total.replace("{count}", String(user.players.length))}
-          </Badge>
-        </div>
-
-        {user.players.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-center text-sm text-muted-foreground">
-              {dict.common.noData}
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {playersWithTextures.map((player) => (
-              <Card key={player.uuid}>
-                <CardContent className="flex items-start gap-4 p-4">
-                  <PlayerHead
-                    skinUrl={player.skinUrl}
-                    size={48}
-                    className="shrink-0"
-                  />
-
-                  {/* Player info */}
-                  <div className="flex-1 space-y-1.5 overflow-hidden">
-                    <p className="truncate text-sm font-medium">
-                      {player.name}
-                    </p>
-                    <p className="truncate font-mono text-xs text-muted-foreground">
-                      {player.uuid}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      <Badge variant="outline" className="text-xs">
-                        {dict.profile.skinModel}: {player.skinModel === "slim" ? dict.player.slim : dict.player.classic}
-                      </Badge>
-                    </div>
-                    {player.createdAt && (
-                      <p className="text-xs text-muted-foreground">
-                        {dict.profile.createdAt}: {formatRelativeTime(player.createdAt, lang)}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Edit link */}
-                  <Link href={`/${lang}/players/${player.uuid}`}>
-                    <Button variant="ghost" size="icon-sm">
-                      <PencilIcon className="size-4" />
-                      <span className="sr-only">{dict.profile.editSkin}</span>
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+      <ProfilePlayers
+        players={playersWithTextures}
+        userUuid={user.uuid}
+        username={user.username}
+        userRole={role}
+        maxPlayerCount={user.maxPlayerCount}
+        isStaff={staff}
+        lang={lang}
+      />
     </div>
   );
 }

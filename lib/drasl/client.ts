@@ -2,8 +2,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { APIError } from "@/lib/types";
 
-const DRASL_API_URL = process.env.DRASL_API_URL ?? "https://drasl.ntust.camp";
-const API_BASE = `${DRASL_API_URL}/drasl/api/v2`;
+export const DRASL_BASE_URL = process.env.DRASL_API_URL ?? "https://drasl.ntust.camp";
+const API_BASE = `${DRASL_BASE_URL}/drasl/api/v2`;
 
 export class DraslAPIError extends Error {
   constructor(
@@ -54,9 +54,16 @@ export async function draslFetch<T>(
   });
 
   if (res.status === 401 || res.status === 403) {
-    const cookieStore = await cookies();
-    cookieStore.delete("drasl_token");
-    cookieStore.delete("drasl_user");
+    // Only clear cookies in mutable contexts (Server Actions / Route Handlers).
+    // In server components / ISR revalidation, cookies are read-only.
+    try {
+      const cookieStore = await cookies();
+      cookieStore.delete("drasl_token");
+      cookieStore.delete("drasl_user");
+      cookieStore.delete("drasl_browser_token");
+    } catch {
+      // Ignored — cookies are read-only in this context
+    }
     redirect("/login");
   }
 

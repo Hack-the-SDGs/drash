@@ -15,7 +15,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ShieldCheckIcon, ShieldOffIcon, UserIcon } from "lucide-react";
+import { ShieldCheckIcon, ShieldOffIcon, UserIcon, ArrowUpIcon, ArrowDownIcon } from "lucide-react";
+import { useSortable } from "@/hooks/use-sortable";
 import type { APIUser } from "@/lib/types";
 
 interface AdminManagerProps {
@@ -33,6 +34,18 @@ export function AdminManager({ users, currentUserUuid }: AdminManagerProps) {
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  const { sorted, sortKey, direction, toggleSort } = useSortable(users, {
+    defaultKey: "adminFirst",
+    defaultDirection: "asc",
+    sortFns: {
+      adminFirst: (a, b) => {
+        if (a.isAdmin !== b.isAdmin) return a.isAdmin ? -1 : 1;
+        return a.username.localeCompare(b.username);
+      },
+      username: (a, b) => a.username.localeCompare(b.username),
+    },
+  });
+
   function handleConfirm() {
     if (!pendingAction) return;
 
@@ -44,6 +57,7 @@ export function AdminManager({ users, currentUserUuid }: AdminManagerProps) {
       } else {
         toast.error(result.error ?? dict.errors.unknown);
       }
+      setPendingAction(null);
     });
   }
 
@@ -59,13 +73,23 @@ export function AdminManager({ users, currentUserUuid }: AdminManagerProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>{dict.users.username}</TableHead>
-              <TableHead>{dict.profile.role}</TableHead>
+              <TableHead>
+                <button className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("username")}>
+                  {dict.users.username}
+                  {sortKey === "username" && (direction === "asc" ? <ArrowUpIcon className="size-3" /> : <ArrowDownIcon className="size-3" />)}
+                </button>
+              </TableHead>
+              <TableHead>
+                <button className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("adminFirst")}>
+                  {dict.profile.role}
+                  {sortKey === "adminFirst" && (direction === "asc" ? <ArrowUpIcon className="size-3" /> : <ArrowDownIcon className="size-3" />)}
+                </button>
+              </TableHead>
               <TableHead>{dict.common.actions}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {users.map((user) => {
+            {sorted.map((user) => {
               const isSelf = user.uuid === currentUserUuid;
 
               return (
