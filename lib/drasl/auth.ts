@@ -8,10 +8,9 @@ import type {
 } from "@/lib/types";
 import { draslFetch, draslFetchNoAuth } from "./client";
 
-const ROOT_USERNAME = process.env.ROOT_USERNAME ?? "";
-
 export function getRole(user: { username: string; isAdmin: boolean }): Role {
-  if (user.username === ROOT_USERNAME && user.isAdmin) return "root";
+  const rootUsername = process.env.ROOT_USERNAME ?? "";
+  if (rootUsername && user.username === rootUsername && user.isAdmin) return "root";
   if (user.isAdmin) return "admin";
   return "user";
 }
@@ -60,7 +59,11 @@ export async function getSession(): Promise<SessionUser | null> {
   const userCookie = cookieStore.get("drasl_user")?.value;
   if (!userCookie) return null;
   try {
-    return JSON.parse(userCookie) as SessionUser;
+    const session = JSON.parse(userCookie) as SessionUser;
+    // Recompute role dynamically so ROOT_USERNAME changes take effect
+    // without requiring re-login
+    session.role = getRole(session);
+    return session;
   } catch {
     return null;
   }

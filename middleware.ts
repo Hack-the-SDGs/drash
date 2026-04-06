@@ -14,12 +14,22 @@ function getSessionUser(request: NextRequest) {
   const cookie = request.cookies.get("drasl_user")?.value;
   if (!cookie) return null;
   try {
-    return JSON.parse(cookie) as {
+    const session = JSON.parse(cookie) as {
       uuid: string;
       username: string;
       isAdmin: boolean;
       role: "root" | "admin" | "user";
     };
+    // Recompute role dynamically so ROOT_USERNAME changes take effect
+    const rootUsername = process.env.ROOT_USERNAME ?? "";
+    if (rootUsername && session.username === rootUsername && session.isAdmin) {
+      session.role = "root";
+    } else if (session.isAdmin) {
+      session.role = "admin";
+    } else {
+      session.role = "user";
+    }
+    return session;
   } catch {
     return null;
   }
