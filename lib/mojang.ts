@@ -15,7 +15,7 @@ export const checkMojangUuid = cache(async (uuid: string): Promise<boolean> => {
       `https://sessionserver.mojang.com/session/minecraft/profile/${cleanUuid}`,
       { next: { revalidate: 3600 } },
     );
-    return res.ok;
+    return res.status === 200;
   } catch {
     return false;
   }
