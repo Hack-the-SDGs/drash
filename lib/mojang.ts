@@ -1,9 +1,25 @@
 "use server";
 
+import { cache } from "react";
+
 interface MojangProfile {
   id: string;
   name: string;
 }
+
+/** Check if a player UUID exists in Mojang's database. */
+export const checkMojangUuid = cache(async (uuid: string): Promise<boolean> => {
+  try {
+    const cleanUuid = uuid.replace(/-/g, "");
+    const res = await fetch(
+      `https://sessionserver.mojang.com/session/minecraft/profile/${cleanUuid}`,
+      { next: { revalidate: 3600 } },
+    );
+    return res.ok;
+  } catch {
+    return false;
+  }
+});
 
 /** Look up a Minecraft player UUID from Mojang by username. */
 export async function lookupMojangUuid(

@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getCurrentUser } from "@/lib/drasl/auth";
+import { getCurrentUser, scrapeUserTokens } from "@/lib/drasl/auth";
 import { DraslAPIError } from "@/lib/drasl/client";
 import { getRole } from "@/lib/drasl/auth";
 import { resolvePlayerTextures } from "@/lib/drasl/textures";
+import { checkMojangUuid } from "@/lib/mojang";
 import { getDictionary, hasLocale, type Locale } from "@/lib/dictionaries";
 import {
   Card,
@@ -19,11 +20,11 @@ import {
   ShieldCheckIcon,
   LockIcon,
   SettingsIcon,
-  CopyIcon,
 } from "lucide-react";
 import { isStaff as checkIsStaff } from "@/lib/permissions";
 import { ProfilePlayers } from "@/components/profile-players";
 import { ProfilePassword } from "@/components/profile-password";
+import { ProfileTokens } from "@/components/profile-tokens";
 
 export default async function ProfilePage(
   props: { params: Promise<{ lang: string }> },
@@ -44,13 +45,18 @@ export default async function ProfilePage(
     throw e;
   }
 
-  // Resolve textures for all players (handles Mojang fallback)
+  // Resolve textures and Mojang status for all players
   const playersWithTextures = await Promise.all(
     user.players.map(async (player) => {
-      const textures = await resolvePlayerTextures(player);
-      return { ...player, ...textures };
+      const [textures, isMojang] = await Promise.all([
+        resolvePlayerTextures(player),
+        checkMojangUuid(player.uuid),
+      ]);
+      return { ...player, ...textures, isMojang };
     }),
   );
+
+  const tokens = await scrapeUserTokens(user.uuid);
 
   const role = getRole(user);
   const staff = checkIsStaff(user);
@@ -159,28 +165,11 @@ export default async function ProfilePage(
       {staff && <ProfilePassword userUuid={user.uuid} />}
 
       {/* Tokens */}
-      {(user.apiToken || user.minecraftToken) && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Tokens</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {user.apiToken && (
-                <div>
-                  <p className="text-xs text-muted-foreground">API Token</p>
-                  <p className="truncate font-mono text-xs">{user.apiToken}</p>
-                </div>
-              )}
-              {user.minecraftToken && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Minecraft Token</p>
-                  <p className="truncate font-mono text-xs">{user.minecraftToken}</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+      {(tokens.apiToken || tokens.minecraftToken) && (
+        <ProfileTokens
+          apiToken={tokens.apiToken || undefined}
+          minecraftToken={tokens.minecraftToken || undefined}
+        />
       )}
 
       {/* My Players section */}

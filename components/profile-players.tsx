@@ -5,7 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { useDict } from "@/components/dict-provider";
 import { deletePlayerAction } from "@/lib/actions/players";
-import { canDeletePlayer, isMojangPlayer } from "@/lib/permissions";
+import { canDeletePlayer } from "@/lib/permissions";
 import { CreatePlayerDialog } from "@/components/create-player-dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { PlayerHead } from "@/components/player-head";
@@ -16,7 +16,7 @@ import { PencilIcon, Trash2Icon, PlusIcon } from "lucide-react";
 import type { APIPlayer, Role } from "@/lib/types";
 
 interface ProfilePlayersProps {
-  players: (APIPlayer & { skinUrl: string; capeUrl: string })[];
+  players: (APIPlayer & { skinUrl: string; capeUrl: string; isMojang: boolean })[];
   userUuid: string;
   username: string;
   userRole: Role;
@@ -79,7 +79,6 @@ export function ProfilePlayers({
             {players.map((player) => {
               const canManage = isStaff || userRole === "admin" || userRole === "root";
               const canDelete = canManage && canDeletePlayer(userRole, username, player.name, username, userRole);
-              const mojang = isMojangPlayer(player);
 
               return (
                 <Card key={player.uuid}>

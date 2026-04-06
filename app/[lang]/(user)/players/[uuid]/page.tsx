@@ -5,7 +5,7 @@ import { DraslAPIError } from "@/lib/drasl/client";
 import { getDictionary, hasLocale, type Locale } from "@/lib/dictionaries";
 import { SkinEditor } from "@/components/skin-editor";
 import { resolvePlayerTextures } from "@/lib/drasl/textures";
-import { isMojangPlayer } from "@/lib/permissions";
+import { checkMojangUuid } from "@/lib/mojang";
 
 export default async function PlayerEditorPage(
   props: { params: Promise<{ lang: string; uuid: string }> },
@@ -39,8 +39,11 @@ export default async function PlayerEditorPage(
     redirect(`/${lang}/profile`);
   }
 
-  // Resolve textures (handles Mojang fallback)
-  const textures = await resolvePlayerTextures(player);
+  // Resolve textures and Mojang status
+  const [textures, isMojang] = await Promise.all([
+    resolvePlayerTextures(player),
+    checkMojangUuid(player.uuid),
+  ]);
   const playerWithTextures = { ...player, ...textures };
 
   return (
@@ -49,7 +52,7 @@ export default async function PlayerEditorPage(
       dict={dict.player}
       commonDict={dict.common}
       lang={lang}
-      readonly={isMojangPlayer(player)}
+      readonly={isMojang}
     />
   );
 }

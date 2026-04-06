@@ -6,6 +6,7 @@ import { getCurrentUser, getRole } from "@/lib/drasl/auth";
 import { AdminPlayerEditor } from "@/components/admin-player-editor";
 import { DraslAPIError } from "@/lib/drasl/client";
 import { resolvePlayerTextures } from "@/lib/drasl/textures";
+import { checkMojangUuid } from "@/lib/mojang";
 
 export default async function EditPlayerPage(
   props: PageProps<"/[lang]/admin/players/[uuid]">,
@@ -23,10 +24,11 @@ export default async function EditPlayerPage(
     throw e;
   }
 
-  const [users, textures, currentUser] = await Promise.all([
+  const [users, textures, currentUser, isMojang] = await Promise.all([
     getUsers(),
     resolvePlayerTextures(player),
     getCurrentUser(),
+    checkMojangUuid(player.uuid),
   ]);
 
   const owner = users.find((u) => u.uuid === player.userUuid);
@@ -49,6 +51,7 @@ export default async function EditPlayerPage(
         player={playerWithTextures}
         ownerUsername={owner?.username}
         lang={lang}
+        isMojang={isMojang}
       />
     </div>
   );

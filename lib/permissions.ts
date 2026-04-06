@@ -1,4 +1,4 @@
-import type { APIPlayer, APIUser, Role } from "@/lib/types";
+import type { APIUser, Role } from "@/lib/types";
 
 /**
  * Whether the viewer can delete a specific player.
@@ -44,11 +44,6 @@ export function canLockUser(
   if (viewerRole === "root") return true;
   if (viewerRole === "admin" && targetRole === "user") return true;
   return false;
-}
-
-/** Player textures come from Mojang and cannot be modified. */
-export function isMojangPlayer(player: APIPlayer): boolean {
-  return !!player.fallbackPlayer;
 }
 
 /** User is a "staff" member who can manage their own players. */
