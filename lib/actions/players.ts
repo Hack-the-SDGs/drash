@@ -59,6 +59,7 @@ export async function createPlayerAction(formData: FormData) {
     await createPlayer(data);
     updateTag("players");
     updateTag("users");
+    updateTag("current-user");
     return { success: true };
   } catch (e) {
     if (e instanceof DraslAPIError) {
@@ -110,6 +111,7 @@ export async function updatePlayerAction(uuid: string, formData: FormData) {
     await updatePlayer(uuid, data);
     updateTag("players");
     updateTag("users");
+    updateTag("current-user");
     return { success: true };
   } catch (e) {
     if (e instanceof DraslAPIError) {
@@ -124,6 +126,7 @@ export async function deletePlayerAction(uuid: string) {
     await deletePlayer(uuid);
     updateTag("players");
     updateTag("users");
+    updateTag("current-user");
     return { success: true };
   } catch (e) {
     if (e instanceof DraslAPIError) {
