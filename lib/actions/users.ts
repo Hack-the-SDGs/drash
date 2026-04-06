@@ -146,11 +146,15 @@ export async function deleteUserAction(uuid: string) {
 }
 
 export async function lockUserAction(uuid: string) {
-  // Prevent locking yourself
-  const { getSession } = await import("@/lib/drasl/auth");
+  const { getSession, getRole } = await import("@/lib/drasl/auth");
+  const { getUser } = await import("@/lib/drasl/users");
+  const { canLockUser } = await import("@/lib/permissions");
   const session = await getSession();
-  if (session?.uuid === uuid) {
-    return { success: false, error: "Cannot lock your own account" };
+  if (!session) return { success: false, error: "Unauthorized" };
+  const target = await getUser(uuid);
+  const targetRole = getRole(target);
+  if (!canLockUser(session.role, targetRole, session.uuid === uuid)) {
+    return { success: false, error: "Insufficient privileges" };
   }
 
   try {
@@ -180,9 +184,10 @@ export async function unlockUserAction(uuid: string) {
 
 export async function resetApiTokenAction(uuid: string) {
   try {
-    await updateUser(uuid, { resetApiToken: true });
+    const user = await updateUser(uuid, { resetApiToken: true });
     updateTag("users");
-    return { success: true };
+    updateTag("current-user");
+    return { success: true, token: user.apiToken };
   } catch (e) {
     if (e instanceof DraslAPIError) {
       return { success: false, error: e.message };
@@ -193,9 +198,9 @@ export async function resetApiTokenAction(uuid: string) {
 
 export async function resetMinecraftTokenAction(uuid: string) {
   try {
-    await updateUser(uuid, { resetMinecraftToken: true });
+    const user = await updateUser(uuid, { resetMinecraftToken: true });
     updateTag("users");
-    return { success: true };
+    return { success: true, token: user.minecraftToken };
   } catch (e) {
     if (e instanceof DraslAPIError) {
       return { success: false, error: e.message };
@@ -254,4 +259,185 @@ export async function setAdminAction(uuid: string, isAdmin: boolean) {
     }
     throw e;
   }
+}
+
+export interface BatchUserInput {
+  username: string;
+  password: string;
+  maxPlayerCount?: number;
+  isAdmin?: boolean;
+  isLocked?: boolean;
+  preferredLanguage?: string;
+  createPlayer?: boolean;
+}
+
+export interface BatchResult {
+  username: string;
+  success: boolean;
+  error?: string;
+}
+
+export interface BatchActionResult {
+  uuid: string;
+  success: boolean;
+  error?: string;
+}
+
+export async function batchLockUsersAction(uuids: string[]): Promise<BatchActionResult[]> {
+  const { getSession } = await import("@/lib/drasl/auth");
+  const session = await getSession();
+  const results: BatchActionResult[] = [];
+
+  for (const uuid of uuids) {
+    if (session?.uuid === uuid) {
+      results.push({ uuid, success: false, error: "Cannot lock your own account" });
+      continue;
+    }
+    try {
+      await updateUser(uuid, { isLocked: true });
+      results.push({ uuid, success: true });
+    } catch (e) {
+      const message = e instanceof DraslAPIError ? e.message : "Unknown error";
+      results.push({ uuid, success: false, error: message });
+    }
+  }
+
+  updateTag("users");
+  return results;
+}
+
+export async function batchUnlockUsersAction(uuids: string[]): Promise<BatchActionResult[]> {
+  const results: BatchActionResult[] = [];
+
+  for (const uuid of uuids) {
+    try {
+      await updateUser(uuid, { isLocked: false });
+      results.push({ uuid, success: true });
+    } catch (e) {
+      const message = e instanceof DraslAPIError ? e.message : "Unknown error";
+      results.push({ uuid, success: false, error: message });
+    }
+  }
+
+  updateTag("users");
+  return results;
+}
+
+export async function batchDeleteUsersAction(uuids: string[]): Promise<BatchActionResult[]> {
+  const { getSession } = await import("@/lib/drasl/auth");
+  const session = await getSession();
+  const results: BatchActionResult[] = [];
+
+  for (const uuid of uuids) {
+    if (session?.uuid === uuid) {
+      results.push({ uuid, success: false, error: "Cannot delete your own account" });
+      continue;
+    }
+    try {
+      await deleteUser(uuid);
+      results.push({ uuid, success: true });
+    } catch (e) {
+      const message = e instanceof DraslAPIError ? e.message : "Unknown error";
+      results.push({ uuid, success: false, error: message });
+    }
+  }
+
+  updateTag("users");
+  return results;
+}
+
+export async function batchSetMaxPlayerCountAction(
+  uuids: string[],
+  maxPlayerCount: number,
+): Promise<BatchActionResult[]> {
+  const results: BatchActionResult[] = [];
+
+  for (const uuid of uuids) {
+    try {
+      await updateUser(uuid, { maxPlayerCount });
+      results.push({ uuid, success: true });
+    } catch (e) {
+      const message = e instanceof DraslAPIError ? e.message : "Unknown error";
+      results.push({ uuid, success: false, error: message });
+    }
+  }
+
+  updateTag("users");
+  return results;
+}
+
+export async function batchResetApiTokenAction(
+  uuids: string[],
+): Promise<BatchActionResult[]> {
+  const results: BatchActionResult[] = [];
+
+  for (const uuid of uuids) {
+    try {
+      await updateUser(uuid, { resetApiToken: true });
+      results.push({ uuid, success: true });
+    } catch (e) {
+      const message = e instanceof DraslAPIError ? e.message : "Unknown error";
+      results.push({ uuid, success: false, error: message });
+    }
+  }
+
+  updateTag("users");
+  return results;
+}
+
+export async function batchResetMinecraftTokenAction(
+  uuids: string[],
+): Promise<BatchActionResult[]> {
+  const results: BatchActionResult[] = [];
+
+  for (const uuid of uuids) {
+    try {
+      await updateUser(uuid, { resetMinecraftToken: true });
+      results.push({ uuid, success: true });
+    } catch (e) {
+      const message = e instanceof DraslAPIError ? e.message : "Unknown error";
+      results.push({ uuid, success: false, error: message });
+    }
+  }
+
+  updateTag("users");
+  return results;
+}
+
+export async function batchCreateUsersAction(
+  users: BatchUserInput[],
+): Promise<BatchResult[]> {
+  const { getSession } = await import("@/lib/drasl/auth");
+  const session = await getSession();
+  if (!session) return users.map(u => ({ username: u.username, success: false, error: "Unauthorized" }));
+
+  const results: BatchResult[] = [];
+
+  for (const input of users) {
+    if (input.isAdmin && session.role !== "root") {
+      results.push({ username: input.username, success: false, error: "Only root can create admin accounts" });
+      continue;
+    }
+    const data: APICreateUserRequest = {
+      username: input.username,
+      password: input.password,
+    };
+    if (input.maxPlayerCount !== undefined) data.maxPlayerCount = input.maxPlayerCount;
+    if (input.isAdmin) data.isAdmin = true;
+    if (input.isLocked) data.isLocked = true;
+    if (input.preferredLanguage) data.preferredLanguage = input.preferredLanguage;
+    if (input.createPlayer) data.playerName = input.username;
+
+    try {
+      await createUser(data);
+      results.push({ username: input.username, success: true });
+    } catch (e) {
+      const message = e instanceof DraslAPIError ? e.message : "Unknown error";
+      results.push({ username: input.username, success: false, error: message });
+    }
+  }
+
+  updateTag("users");
+  updateTag("players");
+  return results;
 }

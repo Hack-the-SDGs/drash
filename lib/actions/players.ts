@@ -59,6 +59,7 @@ export async function createPlayerAction(formData: FormData) {
     await createPlayer(data);
     updateTag("players");
     updateTag("users");
+    updateTag("current-user");
     return { success: true };
   } catch (e) {
     if (e instanceof DraslAPIError) {
@@ -110,6 +111,7 @@ export async function updatePlayerAction(uuid: string, formData: FormData) {
     await updatePlayer(uuid, data);
     updateTag("players");
     updateTag("users");
+    updateTag("current-user");
     return { success: true };
   } catch (e) {
     if (e instanceof DraslAPIError) {
@@ -119,11 +121,37 @@ export async function updatePlayerAction(uuid: string, formData: FormData) {
   }
 }
 
+export interface BatchPlayerResult {
+  uuid: string;
+  success: boolean;
+  error?: string;
+}
+
+export async function batchDeletePlayersAction(uuids: string[]): Promise<BatchPlayerResult[]> {
+  const results: BatchPlayerResult[] = [];
+
+  for (const uuid of uuids) {
+    try {
+      await deletePlayer(uuid);
+      results.push({ uuid, success: true });
+    } catch (e) {
+      const message = e instanceof DraslAPIError ? e.message : "Unknown error";
+      results.push({ uuid, success: false, error: message });
+    }
+  }
+
+  updateTag("players");
+  updateTag("users");
+  updateTag("current-user");
+  return results;
+}
+
 export async function deletePlayerAction(uuid: string) {
   try {
     await deletePlayer(uuid);
     updateTag("players");
     updateTag("users");
+    updateTag("current-user");
     return { success: true };
   } catch (e) {
     if (e instanceof DraslAPIError) {
