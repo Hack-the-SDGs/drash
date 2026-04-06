@@ -267,6 +267,7 @@ export function UserTable({ users, lang, currentUserUuid, viewerRole, userRoles 
                 const playerNames = user.players?.map((p) => p.name) ?? [];
                 const targetRole = userRoles[user.uuid] ?? "user";
                 const canLock = canLockUser(viewerRole, targetRole, isSelf);
+                const canEdit = isSelf || canLock;
                 const isSelected = selected.has(user.uuid);
                 const roleColor = targetRole === "root" ? "text-red-500" : targetRole === "admin" ? "text-amber-500" : undefined;
 
@@ -287,16 +288,21 @@ export function UserTable({ users, lang, currentUserUuid, viewerRole, userRoles 
                     <TableCell>
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
-                          <Link
-                            href={`/${lang}/admin/users/${user.uuid}`}
-                            className={`font-medium hover:underline${roleColor ? ` ${roleColor}` : ""}`}
-                            onClick={(e) => {
-                              // Prevent navigation on Ctrl/Shift click (selection)
-                              if (e.metaKey || e.ctrlKey || e.shiftKey) e.preventDefault();
-                            }}
-                          >
-                            {user.username}
-                          </Link>
+                          {canEdit ? (
+                            <Link
+                              href={`/${lang}/admin/users/${user.uuid}`}
+                              className={`font-medium hover:underline${roleColor ? ` ${roleColor}` : ""}`}
+                              onClick={(e) => {
+                                if (e.metaKey || e.ctrlKey || e.shiftKey) e.preventDefault();
+                              }}
+                            >
+                              {user.username}
+                            </Link>
+                          ) : (
+                            <span className={`font-medium${roleColor ? ` ${roleColor}` : ""}`}>
+                              {user.username}
+                            </span>
+                          )}
                           {isSelf && (
                             <span className="text-xs text-muted-foreground">
                               {dict.users.selfIndicator}

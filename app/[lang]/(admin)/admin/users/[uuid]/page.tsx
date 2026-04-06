@@ -27,7 +27,9 @@ export default async function EditUserPage(
   }
 
   const targetRole = getRole(user);
+  const isSelf = session.uuid === uuid;
   const canManage =
+    isSelf ||
     session.role === "root" ||
     (session.role === "admin" && targetRole === "user");
   if (!canManage) {
