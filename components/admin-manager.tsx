@@ -57,6 +57,7 @@ export function AdminManager({ users, currentUserUuid }: AdminManagerProps) {
       } else {
         toast.error(result.error ?? dict.errors.unknown);
       }
+      setPendingAction(null);
     });
   }
 
