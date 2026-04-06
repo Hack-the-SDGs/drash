@@ -50,7 +50,7 @@ export function LoginForm({
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">{dict.login}</CardTitle>
-          <CardDescription>Drasl Manager</CardDescription>
+          <CardDescription>Drash</CardDescription>
         </CardHeader>
         <CardContent>
           <form action={formAction} className="flex flex-col gap-4">

@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Drasl Manager",
+  title: "Drash",
   description: "Drasl authentication server management panel",
 };
 
