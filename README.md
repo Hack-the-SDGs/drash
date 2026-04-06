@@ -124,3 +124,7 @@ npm run build
 1. 遵循現有的程式碼風格與架構慣例
 2. 通過 `npm run lint` 與 `npm run build`
 3. 以 `feature/your-feature` 或 `fix/your-fix` 命名分支
+4. 發布 PR 時，目標分支為 `dev`
+
+## 授權
+本專案採用 [GNU Affero General Public License v3.0](LICENSE) 授權。
