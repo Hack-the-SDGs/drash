@@ -12,7 +12,7 @@ import { PlayerHead } from "@/components/player-head";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PencilIcon, Trash2Icon, PlusIcon } from "lucide-react";
+import { Trash2Icon, PlusIcon } from "lucide-react";
 import type { APIPlayer, Role } from "@/lib/types";
 
 interface ProfilePlayersProps {
@@ -81,37 +81,35 @@ export function ProfilePlayers({
               const canDelete = canManage && canDeletePlayer(userRole, username, player.name, username, userRole);
 
               return (
-                <Card key={player.uuid}>
-                  <CardContent className="flex items-start gap-4 p-4">
-                    <PlayerHead skinUrl={player.skinUrl} size={48} className="shrink-0" />
-                    <div className="flex-1 space-y-1.5 overflow-hidden">
-                      <p className="truncate text-sm font-medium">{player.name}</p>
-                      <p className="truncate font-mono text-xs text-muted-foreground">{player.uuid}</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        <Badge variant="outline" className="text-xs">
-                          {dict.profile.skinModel}: {player.skinModel === "slim" ? dict.player.slim : dict.player.classic}
-                        </Badge>
+                <Card key={player.uuid} className="transition-colors hover:bg-muted/50">
+                  <Link href={`/${lang}/players/${player.uuid}`} className="block">
+                    <CardContent className="flex items-start gap-4 p-4">
+                      <PlayerHead skinUrl={player.skinUrl} size={48} className="shrink-0" />
+                      <div className="flex-1 space-y-1.5 overflow-hidden">
+                        <p className="truncate text-sm font-medium">{player.name}</p>
+                        <p className="truncate font-mono text-xs text-muted-foreground">{player.uuid}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          <Badge variant="outline" className="text-xs">
+                            {dict.profile.skinModel}: {player.skinModel === "slim" ? dict.player.slim : dict.player.classic}
+                          </Badge>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <Link href={`/${lang}/players/${player.uuid}`}>
-                        <Button variant="ghost" size="icon-sm">
-                          <PencilIcon className="size-4" />
-                        </Button>
-                      </Link>
                       {canManage && (
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          onClick={() => setDeleteTarget({ uuid: player.uuid, name: player.name })}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setDeleteTarget({ uuid: player.uuid, name: player.name });
+                          }}
                           disabled={!canDelete || isPending}
                           title={!canDelete ? dict.users.cannotDeleteSameNamePlayer : undefined}
                         >
                           <Trash2Icon className="size-4 text-destructive" />
                         </Button>
                       )}
-                    </div>
-                  </CardContent>
+                    </CardContent>
+                  </Link>
                 </Card>
               );
             })}

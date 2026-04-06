@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { getCurrentUser, scrapeUserTokens } from "@/lib/drasl/auth";
 import { DraslAPIError } from "@/lib/drasl/client";
 import { getRole } from "@/lib/drasl/auth";
@@ -14,12 +13,9 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   UserIcon,
-  ShieldCheckIcon,
   LockIcon,
-  SettingsIcon,
 } from "lucide-react";
 import { isStaff as checkIsStaff } from "@/lib/permissions";
 import { ProfilePlayers } from "@/components/profile-players";
@@ -67,26 +63,12 @@ export default async function ProfilePage(
       ? "default"
       : "secondary";
 
-  const isAdmin = role === "admin" || role === "root";
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{dict.profile.title}</h1>
-          <p className="text-muted-foreground">{dict.profile.description}</p>
-        </div>
-        {isAdmin && (
-          <Button
-            size="sm"
-            variant="outline"
-            nativeButton={false}
-            render={<Link href={`/${lang}/admin/users`} />}
-          >
-            <SettingsIcon className="size-4" data-icon="inline-start" />
-            {dict.common.goToAdmin}
-          </Button>
-        )}
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">{dict.profile.title}</h1>
+        <p className="text-muted-foreground">{dict.profile.description}</p>
       </div>
 
       {/* User info card */}
@@ -124,30 +106,17 @@ export default async function ProfilePage(
               </p>
               <Badge variant={roleBadgeVariant}>{role}</Badge>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {user.isAdmin && (
-                <div>
-                  <p className="text-xs text-muted-foreground">
-                    {dict.profile.isAdmin}
-                  </p>
-                  <Badge variant="default" className="bg-blue-600 hover:bg-blue-600">
-                    <ShieldCheckIcon className="size-3" />
-                    {dict.profile.isAdmin}
-                  </Badge>
-                </div>
-              )}
-              {user.isLocked && (
-                <div>
-                  <p className="text-xs text-muted-foreground">
-                    {dict.profile.isLocked}
-                  </p>
-                  <Badge variant="destructive">
-                    <LockIcon className="size-3" />
-                    {dict.profile.isLocked}
-                  </Badge>
-                </div>
-              )}
-            </div>
+            {user.isLocked && (
+              <div>
+                <p className="text-xs text-muted-foreground">
+                  {dict.profile.isLocked}
+                </p>
+                <Badge variant="destructive">
+                  <LockIcon className="size-3" />
+                  {dict.profile.isLocked}
+                </Badge>
+              </div>
+            )}
             <div>
               <p className="text-xs text-muted-foreground">{dict.profile.playerLimit}</p>
               <p className="text-sm font-medium">
