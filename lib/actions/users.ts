@@ -181,7 +181,23 @@ export async function unlockUserAction(uuid: string) {
 export async function resetApiTokenAction(uuid: string) {
   try {
     const user = await updateUser(uuid, { resetApiToken: true });
+
+    // If resetting own token, update the auth cookie with the new token
+    const { getSession } = await import("@/lib/drasl/auth");
+    const session = await getSession();
+    if (session?.uuid === uuid && user.apiToken) {
+      const { cookies } = await import("next/headers");
+      const cookieStore = await cookies();
+      cookieStore.set("drasl_token", user.apiToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "strict",
+        path: "/",
+      });
+    }
+
     updateTag("users");
+    updateTag("current-user");
     return { success: true, token: user.apiToken };
   } catch (e) {
     if (e instanceof DraslAPIError) {
