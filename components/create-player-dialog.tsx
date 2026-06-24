@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { useDict } from "@/components/dict-provider";
 import { createPlayerAction } from "@/lib/actions/players";
-import { lookupMojangUuid } from "@/lib/mojang";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,7 +21,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { SearchIcon, Loader2Icon } from "lucide-react";
 import type { APIUser } from "@/lib/types";
 
 interface CreatePlayerDialogProps {
@@ -49,39 +47,13 @@ export function CreatePlayerDialog({
   const [skinModel, setSkinModel] = useState<string>("classic");
   const [selectedUserUuid, setSelectedUserUuid] = useState(userUuid ?? "");
 
-  // Mojang lookup state
   const [mojangUsername, setMojangUsername] = useState("");
-  const [mojangResult, setMojangResult] = useState<{
-    uuid: string;
-    name: string;
-  } | null>(null);
-  const [mojangError, setMojangError] = useState(false);
-  const [isLookingUp, setIsLookingUp] = useState(false);
 
   function resetState() {
     setMode("new");
     setSkinModel("classic");
     setMojangUsername("");
-    setMojangResult(null);
-    setMojangError(false);
     setSelectedUserUuid(userUuid ?? "");
-  }
-
-  async function handleMojangLookup() {
-    if (!mojangUsername.trim()) return;
-    setIsLookingUp(true);
-    setMojangError(false);
-    setMojangResult(null);
-    const result = await lookupMojangUuid(mojangUsername.trim());
-    if (result?.error) {
-      console.error("[mojang-lookup]", result.error);
-      setMojangError(true);
-    } else if (result?.uuid) {
-      setMojangResult(result);
-    } else {
-      setMojangError(true);
-    }
-    setIsLookingUp(false);
   }
 
   function handleSubmit(formData: FormData) {
@@ -90,9 +62,7 @@ export function CreatePlayerDialog({
     if (skinModel) formData.set("skinModel", skinModel);
 
     if (mode === "existing") {
-      // Use the looked-up name or the manually entered username as the player name
-      const playerName = mojangResult?.name || mojangUsername.trim();
-      if (playerName) formData.set("name", playerName);
+      formData.set("name", mojangUsername.trim());
       formData.set("existingPlayer", "true");
     }
 
@@ -210,49 +180,14 @@ export function CreatePlayerDialog({
               </div>
             </>
           ) : (
-            <>
-              {/* Mojang username lookup */}
-              <div className="space-y-1.5">
-                <Label>{dict.player.mojangUsername}</Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={mojangUsername}
-                    onChange={(e) => {
-                      setMojangUsername(e.target.value);
-                      setMojangError(false);
-                      setMojangResult(null);
-                    }}
-                    placeholder="Steve"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleMojangLookup}
-                    disabled={isLookingUp || !mojangUsername.trim()}
-                  >
-                    {isLookingUp ? (
-                      <Loader2Icon className="size-4 animate-spin" />
-                    ) : (
-                      <SearchIcon className="size-4" />
-                    )}
-                    {dict.player.lookupMojang}
-                  </Button>
-                </div>
-                {mojangResult && (
-                  <p className="text-sm text-green-600">
-                    {dict.player.mojangFound.replace("{name}", mojangResult.name)}
-                    <span className="ml-1 font-mono text-xs text-muted-foreground">
-                      {mojangResult.uuid}
-                    </span>
-                  </p>
-                )}
-                {mojangError && (
-                  <p className="text-sm text-destructive">
-                    {dict.player.mojangNotFound}
-                  </p>
-                )}
-              </div>
-            </>
+            <div className="space-y-1.5">
+              <Label>{dict.player.mojangUsername}</Label>
+              <Input
+                value={mojangUsername}
+                onChange={(e) => setMojangUsername(e.target.value)}
+                placeholder="Steve"
+              />
+            </div>
           )}
 
           <DialogFooter>

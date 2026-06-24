@@ -14,4 +14,3 @@ export const checkMojangUuid = cache(async (uuid: string): Promise<boolean> => {
   }
 });
 
-export { lookupMojangUuid } from "@/lib/mojang-lookup";
