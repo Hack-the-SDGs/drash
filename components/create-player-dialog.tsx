@@ -73,7 +73,10 @@ export function CreatePlayerDialog({
     setMojangError(false);
     setMojangResult(null);
     const result = await lookupMojangUuid(mojangUsername.trim());
-    if (result) {
+    if (result?.error) {
+      console.error("[mojang-lookup]", result.error);
+      setMojangError(true);
+    } else if (result?.uuid) {
       setMojangResult(result);
     } else {
       setMojangError(true);
