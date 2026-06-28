@@ -4,7 +4,7 @@ import { readConfig } from "@/lib/groups/store";
 import { expectedUsernamesForTopic } from "@/lib/groups/naming";
 import { TopicManager, type TopicStat } from "@/components/topic-manager";
 
-export default async function TopicsPage(props: { params: Promise<{ lang: string }> }) {
+export default async function TopicsPage(props: PageProps<"/[lang]/admin/topics">) {
   const { lang } = await props.params;
   const dict = await getDictionary(lang as Locale);
 

@@ -4,7 +4,7 @@ import { readConfig } from "@/lib/groups/store";
 import { expectedUsernamesForGroup } from "@/lib/groups/naming";
 import { GroupManager, type GroupStat } from "@/components/group-manager";
 
-export default async function GroupsPage(props: { params: Promise<{ lang: string }> }) {
+export default async function GroupsPage(props: PageProps<"/[lang]/admin/groups">) {
   const { lang } = await props.params;
   const dict = await getDictionary(lang as Locale);
 
