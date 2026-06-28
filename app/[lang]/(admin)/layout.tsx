@@ -13,6 +13,8 @@ import {
   LogOutIcon,
   Users,
   Gamepad2,
+  Boxes,
+  ClipboardList,
   TicketPlus,
   ShieldCheck,
   UserCircle,
@@ -41,6 +43,16 @@ export default async function AdminLayout(
       label: dict.nav.players,
       href: `/${lang}/admin/players`,
       icon: <Gamepad2 />,
+    },
+    {
+      label: dict.nav.groups,
+      href: `/${lang}/admin/groups`,
+      icon: <Boxes />,
+    },
+    {
+      label: dict.nav.topics,
+      href: `/${lang}/admin/topics`,
+      icon: <ClipboardList />,
     },
     {
       label: dict.nav.invites,
