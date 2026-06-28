@@ -268,6 +268,8 @@
     "codeColumn": "代號",
     "open": "開放",
     "opened": "題目已開放（解鎖 {count} 個帳號）",
-    "closed": "題目已關閉（鎖定 {count} 個帳號）"
+    "closed": "題目已關閉（鎖定 {count} 個帳號）",
+    "botCount": "機器人數量",
+    "botCountHint": "至少 1；大於 1 時帳號會加上 _1、_2 後綴"
   }
 }

@@ -5,6 +5,7 @@ import type { APIUser } from "@/lib/types";
 import type { Group, Topic } from "./types";
 import {
   accountsForTopicInGroup,
+  accountsForTopic,
   expectedUsernamesForTopic,
   personalUsername,
   personalPassword,
@@ -37,11 +38,12 @@ async function createIfAbsent(
   password: string,
   map: Map<string, APIUser>,
   r: SyncResult,
+  locked = false,
 ): Promise<void> {
   if (map.has(username)) return;
   try {
     // playerName === username creates a same-named player alongside the user.
-    await createUser({ username, password, playerName: username });
+    await createUser({ username, password, playerName: username, isLocked: locked });
     r.created++;
   } catch (e) {
     r.errors.push(`建立 ${username}: ${errMsg(e)}`);
@@ -93,6 +95,32 @@ async function setLock(
   } catch (e) {
     r.errors.push(`${locked ? "鎖定" : "解鎖"} ${username}: ${errMsg(e)}`);
   }
+}
+
+/**
+ * Apply a topic's bot-count change: delete accounts no longer expected and
+ * create the newly added ones (matching the topic's open/locked state).
+ */
+export async function syncUpdateTopicBotCount(
+  oldTopic: Topic,
+  newTopic: Topic,
+  groups: Group[],
+): Promise<SyncResult> {
+  const r = emptyResult();
+  const map = await usernameMap();
+  const oldNames = new Set(expectedUsernamesForTopic(oldTopic, groups));
+  const newAccounts = await accountsForTopic(groups, newTopic);
+  const newNames = new Set(newAccounts.map((a) => a.username));
+
+  for (const name of oldNames) {
+    if (!newNames.has(name)) await deleteIfPresent(name, map, r);
+  }
+  for (const account of newAccounts) {
+    if (!oldNames.has(account.username)) {
+      await createIfAbsent(account.username, account.password, map, r, !newTopic.open);
+    }
+  }
+  return r;
 }
 
 /** Lock (close) or unlock (open) every existing account of a topic. */

@@ -30,7 +30,7 @@ import {
 import { PlusIcon, Trash2Icon } from "lucide-react";
 import {
   createTopicAction,
-  updateTopicNameAction,
+  updateTopicAction,
   deleteTopicAction,
   setTopicOpenAction,
   type TopicActionResult,
@@ -118,6 +118,7 @@ export function TopicManager({ topics, stats }: TopicManagerProps) {
                 <TableHead>{dict.topics.topicName}</TableHead>
                 <TableHead>{dict.topics.codeColumn}</TableHead>
                 <TableHead>{dict.topics.type}</TableHead>
+                <TableHead className="text-right">{dict.topics.botCount}</TableHead>
                 <TableHead className="text-right">{dict.topics.accountCount}</TableHead>
                 <TableHead>{dict.topics.open}</TableHead>
                 <TableHead className="w-[60px]">{dict.common.actions}</TableHead>
@@ -137,6 +138,7 @@ export function TopicManager({ topics, stats }: TopicManagerProps) {
                       {topic.type === "group" ? dict.topics.group : dict.topics.personal}
                     </Badge>
                   </TableCell>
+                  <TableCell className="text-right tabular-nums">{topic.botCount}</TableCell>
                   <TableCell className="text-right tabular-nums">
                     {countByCode.get(topic.code) ?? 0}
                   </TableCell>
@@ -168,21 +170,21 @@ export function TopicManager({ topics, stats }: TopicManagerProps) {
         open={createOpen}
         onOpenChange={setCreateOpen}
         pending={isPending}
-        onSubmit={(name, code, type) =>
-          run(() => createTopicAction(name, code, type), dict.topics.created, () =>
+        onSubmit={(name, code, type, botCount) =>
+          run(() => createTopicAction(name, code, type, botCount), dict.topics.created, () =>
             setCreateOpen(false),
           )
         }
       />
 
-      <RenameTopicDialog
-        key={`rename-${renameTarget?.code ?? "none"}`}
+      <EditTopicDialog
+        key={`edit-${renameTarget?.code ?? "none"}`}
         topic={renameTarget}
         onClose={() => setRenameTarget(null)}
         pending={isPending}
-        onSubmit={(name) =>
+        onSubmit={(name, botCount) =>
           run(
-            () => updateTopicNameAction(renameTarget!.code, name),
+            () => updateTopicAction(renameTarget!.code, name, botCount),
             dict.topics.renamed,
             () => setRenameTarget(null),
           )
@@ -219,21 +221,25 @@ function CreateTopicDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   pending: boolean;
-  onSubmit: (name: string, code: string, type: TopicType) => void;
+  onSubmit: (name: string, code: string, type: TopicType, botCount: number) => void;
 }) {
   const dict = useDict();
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [type, setType] = useState<TopicType>("personal");
+  const [botCount, setBotCount] = useState("1");
 
   function handleOpenChange(next: boolean) {
     if (next) {
       setName("");
       setCode("");
       setType("personal");
+      setBotCount("1");
     }
     onOpenChange(next);
   }
+
+  const botCountValid = /^\d+$/.test(botCount) && Number(botCount) >= 1;
 
   const options: { value: TopicType; label: string; hint: string }[] = [
     { value: "personal", label: dict.topics.personal, hint: dict.topics.personalHint },
@@ -268,6 +274,16 @@ function CreateTopicDialog({
             <p className="text-xs text-muted-foreground">{dict.topics.topicCodeHint}</p>
           </div>
           <div className="space-y-1.5">
+            <Label htmlFor="topic-botcount">{dict.topics.botCount}</Label>
+            <Input
+              id="topic-botcount"
+              inputMode="numeric"
+              value={botCount}
+              onChange={(e) => setBotCount(e.target.value.replace(/\D/g, ""))}
+            />
+            <p className="text-xs text-muted-foreground">{dict.topics.botCountHint}</p>
+          </div>
+          <div className="space-y-1.5">
             <Label>{dict.topics.type}</Label>
             <div className="grid grid-cols-2 gap-2">
               {options.map((o) => (
@@ -294,8 +310,8 @@ function CreateTopicDialog({
             {dict.common.cancel}
           </Button>
           <Button
-            onClick={() => onSubmit(name, code, type)}
-            disabled={pending || !name.trim() || !code.trim()}
+            onClick={() => onSubmit(name, code, type, Number(botCount))}
+            disabled={pending || !name.trim() || !code.trim() || !botCountValid}
           >
             {pending ? "..." : dict.common.create}
           </Button>
@@ -305,7 +321,7 @@ function CreateTopicDialog({
   );
 }
 
-function RenameTopicDialog({
+function EditTopicDialog({
   topic,
   onClose,
   pending,
@@ -314,11 +330,14 @@ function RenameTopicDialog({
   topic: Topic | null;
   onClose: () => void;
   pending: boolean;
-  onSubmit: (name: string) => void;
+  onSubmit: (name: string, botCount: number) => void;
 }) {
   const dict = useDict();
-  // Prefilled with the topic's current name (remounts per target via key).
-  const [value, setValue] = useState(topic?.name ?? "");
+  // Prefilled with the topic's current values (remounts per target via key).
+  const [name, setName] = useState(topic?.name ?? "");
+  const [botCount, setBotCount] = useState(String(topic?.botCount ?? 1));
+
+  const botCountValid = /^\d+$/.test(botCount) && Number(botCount) >= 1;
 
   return (
     <Dialog open={topic !== null} onOpenChange={(open) => !open && onClose()}>
@@ -327,20 +346,35 @@ function RenameTopicDialog({
           <DialogTitle>{dict.topics.rename}</DialogTitle>
           <DialogDescription>{topic?.code}</DialogDescription>
         </DialogHeader>
-        <div className="space-y-1.5">
-          <Label htmlFor="rename-topic">{dict.topics.topicName}</Label>
-          <Input
-            id="rename-topic"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            autoFocus
-          />
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-topic-name">{dict.topics.topicName}</Label>
+            <Input
+              id="edit-topic-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-topic-botcount">{dict.topics.botCount}</Label>
+            <Input
+              id="edit-topic-botcount"
+              inputMode="numeric"
+              value={botCount}
+              onChange={(e) => setBotCount(e.target.value.replace(/\D/g, ""))}
+            />
+            <p className="text-xs text-muted-foreground">{dict.topics.botCountHint}</p>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={pending}>
             {dict.common.cancel}
           </Button>
-          <Button onClick={() => onSubmit(value)} disabled={pending || !value.trim()}>
+          <Button
+            onClick={() => onSubmit(name, Number(botCount))}
+            disabled={pending || !name.trim() || !botCountValid}
+          >
             {pending ? "..." : dict.common.save}
           </Button>
         </DialogFooter>
