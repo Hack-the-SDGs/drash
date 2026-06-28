@@ -2,6 +2,8 @@ import { getDictionary, type Locale } from "@/lib/dictionaries";
 import { getPlayers } from "@/lib/drasl/players";
 import { getUsers } from "@/lib/drasl/users";
 import { getCurrentUser, getRole } from "@/lib/drasl/auth";
+import { readConfig } from "@/lib/groups/store";
+import { allGeneratedUsernames } from "@/lib/groups/naming";
 import { PlayerTable } from "@/components/player-table";
 
 export default async function PlayersPage(
@@ -10,7 +12,16 @@ export default async function PlayersPage(
   const { lang } = await props.params;
   const dict = await getDictionary(lang as Locale);
 
-  const [players, users, currentUser] = await Promise.all([getPlayers(), getUsers(), getCurrentUser()]);
+  const [allPlayers, users, currentUser, config] = await Promise.all([
+    getPlayers(),
+    getUsers(),
+    getCurrentUser(),
+    readConfig(),
+  ]);
+
+  // Hide players generated for groups/topics; they're managed on those pages.
+  const generated = allGeneratedUsernames(config);
+  const players = allPlayers.filter((p) => !generated.has(p.name));
 
   // Textures are resolved lazily per visible row (see LazyPlayerHead) so the
   // table renders instantly instead of blocking on every player's skin here.
