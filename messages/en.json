@@ -270,6 +270,6 @@
     "opened": "Topic opened ({count} accounts unlocked)",
     "closed": "Topic closed ({count} accounts locked)",
     "botCount": "Bots",
-    "botCountHint": "At least 1; when above 1, accounts get _1, _2 … suffixes"
+    "botCountHint": "1 to 10; when above 1, accounts get _1, _2 … suffixes"
   }
 }

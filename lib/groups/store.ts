@@ -1,6 +1,6 @@
 import "server-only";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { EMPTY_CONFIG, type GroupsConfig } from "./types";
+import { EMPTY_CONFIG, sanitizeStoredBotCount, type GroupsConfig } from "./types";
 
 const KEY = "config";
 
@@ -17,13 +17,18 @@ export async function readConfig(): Promise<GroupsConfig> {
   if (!raw) return EMPTY_CONFIG;
   try {
     const parsed = JSON.parse(raw) as Partial<GroupsConfig>;
-    // Normalize legacy topics that predate the `open`/`botCount` fields.
+    // Normalize topics: coerce open to a real boolean and sanitize botCount.
+    // We DON'T lower legacy counts to the write-time max here — doing so would
+    // drop _11+ accounts from the expected/managed set on a later write-back —
+    // only guard against non-integers, <1, and absurd values.
     const topics = (parsed.topics ?? []).map((t) => ({
       ...t,
-      open: t.open ?? true,
-      botCount: t.botCount ?? 1,
+      open: typeof t.open === "boolean" ? t.open : true,
+      botCount: sanitizeStoredBotCount(t.botCount),
     }));
-    return { groups: parsed.groups ?? [], topics };
+    // Keep `managed` undefined for legacy configs so actions can adopt once.
+    const managed = Array.isArray(parsed.managed) ? parsed.managed : undefined;
+    return { groups: parsed.groups ?? [], topics, managed };
   } catch {
     return EMPTY_CONFIG;
   }
