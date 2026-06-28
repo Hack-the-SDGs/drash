@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -33,9 +34,11 @@ export function ConfirmDialog({
   destructive = false,
   pending = false,
 }: ConfirmDialogProps) {
+  // Focus the confirm button on open so Enter confirms immediately.
+  const confirmRef = useRef<HTMLButtonElement>(null);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton={false}>
+      <DialogContent showCloseButton={false} initialFocus={confirmRef}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
@@ -49,6 +52,7 @@ export function ConfirmDialog({
             {cancelLabel}
           </Button>
           <Button
+            ref={confirmRef}
             variant={destructive ? "destructive" : "default"}
             onClick={onConfirm}
             disabled={pending}
