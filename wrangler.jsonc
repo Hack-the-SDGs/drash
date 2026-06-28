@@ -10,5 +10,11 @@
 	},
 	"vars": {
 		"ROOT_USERNAME": "root"
-	}
+	},
+	"kv_namespaces": [
+		{
+			"binding": "GROUPS_KV",
+			"id": "1da5461fddec4de595b6743153b41b9c"
+		}
+	]
 }

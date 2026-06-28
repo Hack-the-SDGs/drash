@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useDict } from "@/components/dict-provider";
 import { setAdminAction } from "@/lib/actions/users";
@@ -22,6 +23,7 @@ import type { APIUser } from "@/lib/types";
 interface AdminManagerProps {
   users: APIUser[];
   currentUserUuid: string;
+  lang: string;
 }
 
 interface PendingAction {
@@ -29,8 +31,9 @@ interface PendingAction {
   promote: boolean;
 }
 
-export function AdminManager({ users, currentUserUuid }: AdminManagerProps) {
+export function AdminManager({ users, currentUserUuid, lang }: AdminManagerProps) {
   const dict = useDict();
+  const router = useRouter();
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -95,7 +98,8 @@ export function AdminManager({ users, currentUserUuid }: AdminManagerProps) {
               return (
                 <TableRow
                   key={user.uuid}
-                  className={isSelf ? "bg-primary/5" : undefined}
+                  className={`cursor-pointer${isSelf ? " bg-primary/5" : ""}`}
+                  onClick={() => router.push(`/${lang}/admin/users/${user.uuid}`)}
                 >
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -120,7 +124,7 @@ export function AdminManager({ users, currentUserUuid }: AdminManagerProps) {
                       </Badge>
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                     {user.isAdmin ? (
                       <div className="flex items-center gap-2">
                         <Button
