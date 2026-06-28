@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { PlayerHead } from "@/components/player-head";
+import { LazyPlayerHead } from "@/components/lazy-player-head";
 import { useDict } from "@/components/dict-provider";
 import { deletePlayerAction, batchDeletePlayersAction } from "@/lib/actions/players";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -191,7 +191,7 @@ export function PlayerTable({ players, userMap, userRoleMap, users, lang, viewer
                   >
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <PlayerHead skinUrl={player.skinUrl} playerUuid={player.uuid} size={32} />
+                        <LazyPlayerHead skinUrl={player.skinUrl} playerUuid={player.uuid} size={32} lang={lang} />
                         {manageable ? (
                           <Link
                             href={`/${lang}/admin/players/${player.uuid}`}

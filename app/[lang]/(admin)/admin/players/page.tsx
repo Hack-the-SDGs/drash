@@ -3,7 +3,6 @@ import { getPlayers } from "@/lib/drasl/players";
 import { getUsers } from "@/lib/drasl/users";
 import { getCurrentUser, getRole } from "@/lib/drasl/auth";
 import { PlayerTable } from "@/components/player-table";
-import { resolvePlayerTextures } from "@/lib/drasl/textures";
 
 export default async function PlayersPage(
   props: PageProps<"/[lang]/admin/players">,
@@ -13,14 +12,8 @@ export default async function PlayersPage(
 
   const [players, users, currentUser] = await Promise.all([getPlayers(), getUsers(), getCurrentUser()]);
 
-  // Resolve textures for all players (handles Mojang fallback)
-  const playersWithTextures = await Promise.all(
-    players.map(async (player) => {
-      const textures = await resolvePlayerTextures(player);
-      return { ...player, ...textures };
-    }),
-  );
-
+  // Textures are resolved lazily per visible row (see LazyPlayerHead) so the
+  // table renders instantly instead of blocking on every player's skin here.
   const userMap: Record<string, string> = {};
   const userRoleMap: Record<string, import("@/lib/types").Role> = {};
   for (const user of users) {
@@ -36,7 +29,7 @@ export default async function PlayersPage(
           <p className="text-muted-foreground">{dict.player.description}</p>
         </div>
       </div>
-      <PlayerTable players={playersWithTextures} userMap={userMap} userRoleMap={userRoleMap} users={users} lang={lang} viewerRole={getRole(currentUser)} viewerUsername={currentUser.username} />
+      <PlayerTable players={players} userMap={userMap} userRoleMap={userRoleMap} users={users} lang={lang} viewerRole={getRole(currentUser)} viewerUsername={currentUser.username} />
     </div>
   );
 }
