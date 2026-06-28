@@ -50,16 +50,21 @@ export async function createGroupAction(
   if (dup) return fail(`組員編號 ${dup} 已屬於其他組別`);
 
   const group: Group = { number, members };
-  // Create accounts first, then persist config so the registry reflects what
-  // actually got created (and a phantom config isn't left behind on failure).
+  // Create accounts first. If any failed, don't persist the group — only the
+  // registry — so a half-created group isn't saved as configured. A retry
+  // re-runs creation (existing accounts are skipped as ours) and converges.
   const managed = loadManaged(config);
   const sync = await syncCreateGroup(group, config.topics, managed);
+  updateTag("users");
+  if (sync.errors.length > 0) {
+    await writeConfig({ ...config, managed: [...managed] });
+    return { success: false, error: syncFailure(sync), sync };
+  }
   await writeConfig({
     ...config,
     groups: [...config.groups, group],
     managed: [...managed],
   });
-  updateTag("users");
   return { success: true, sync };
 }
 
@@ -113,13 +118,19 @@ export async function renumberGroupAction(
   const updated: Group = { ...group, number: newNumber };
   const managed = loadManaged(config);
   const sync = await syncRenumberGroup(oldNumber, updated, config.topics, managed);
+  updateTag("users");
+  if (sync.errors.length > 0) {
+    // Keep the old number so a retry recomputes from the same baseline and
+    // finishes the partial rename, rather than stranding old-number accounts.
+    await writeConfig({ ...config, managed: [...managed] });
+    return { success: false, error: syncFailure(sync), sync };
+  }
   await writeConfig({
     ...config,
     groups: config.groups.map((g) => (g.number === oldNumber ? updated : g)),
     managed: [...managed],
   });
-  updateTag("users");
-  return { success: sync.errors.length === 0, error: sync.errors.length ? syncFailure(sync) : undefined, sync };
+  return { success: true, sync };
 }
 
 export async function updateMembersAction(
@@ -152,11 +163,17 @@ export async function updateMembersAction(
   const personalTopics = config.topics.filter((t) => t.type === "personal");
   const managed = loadManaged(config);
   const sync = await syncUpdateMembers(updated, added, removed, personalTopics, managed);
+  updateTag("users");
+  if (sync.errors.length > 0) {
+    // Keep the old member list so a failed removal still shows the member to
+    // process on retry, rather than stranding their lingering accounts.
+    await writeConfig({ ...config, managed: [...managed] });
+    return { success: false, error: syncFailure(sync), sync };
+  }
   await writeConfig({
     ...config,
     groups: config.groups.map((g) => (g.number === number ? updated : g)),
     managed: [...managed],
   });
-  updateTag("users");
-  return { success: sync.errors.length === 0, error: sync.errors.length ? syncFailure(sync) : undefined, sync };
+  return { success: true, sync };
 }

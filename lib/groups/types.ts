@@ -33,12 +33,20 @@ export interface GroupsConfig {
 
 export const EMPTY_CONFIG: GroupsConfig = { groups: [], topics: [] };
 
-/** Maximum bots a single topic may generate per group/member. */
+/** Maximum bots a single topic may generate per group/member (write-time rule). */
 export const MAX_BOT_COUNT = 10;
 
-/** Coerce any stored/submitted value to a valid bot count in [1, MAX_BOT_COUNT]. */
-export function clampBotCount(value: unknown): number {
+/**
+ * Read-time safety ceiling. Higher than MAX_BOT_COUNT so a pre-cap legacy value
+ * (e.g. 12) keeps its extra accounts in the expected/managed set — they can
+ * still be locked or deleted — while an absurd value can't allocate a giant
+ * username array. The ≤ MAX_BOT_COUNT business rule is enforced only on write.
+ */
+const STORED_BOT_COUNT_CEILING = 100;
+
+/** Sanitize a stored bot count to a positive integer, bounded for memory safety. */
+export function sanitizeStoredBotCount(value: unknown): number {
   const n = Math.floor(Number(value));
   if (!Number.isFinite(n) || n < 1) return 1;
-  return Math.min(n, MAX_BOT_COUNT);
+  return Math.min(n, STORED_BOT_COUNT_CEILING);
 }

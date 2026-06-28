@@ -57,15 +57,21 @@ export async function createTopicAction(
   if (config.topics.some((t) => t.code === code)) return fail(`題目代號 ${code} 已存在`);
 
   const topic: Topic = { name, code, type, open: true, botCount };
-  // Create accounts first, then persist config + the updated registry.
+  // Create accounts first. If any failed, don't persist the topic — only the
+  // registry — so it isn't saved with a partial account set. A retry re-runs
+  // creation (existing accounts skipped as ours) and converges.
   const managed = loadManaged(config);
   const sync = await syncCreateTopic(config.groups, topic, managed);
+  updateTag("users");
+  if (sync.errors.length > 0) {
+    await writeConfig({ ...config, managed: [...managed] });
+    return { success: false, error: syncFailure(sync), sync };
+  }
   await writeConfig({
     ...config,
     topics: [...config.topics, topic],
     managed: [...managed],
   });
-  updateTag("users");
   return { success: true, sync };
 }
 
@@ -122,6 +128,16 @@ export async function updateTopicAction(
   if (topic.botCount !== botCount) {
     sync = await syncUpdateTopicBotCount(topic, updated, config.groups, managed);
     updateTag("users");
+  }
+  if (sync && sync.errors.length > 0) {
+    // Keep the old botCount (apply the name change only) so the expected set
+    // still covers the lingering suffixed accounts for later cleanup.
+    await writeConfig({
+      ...config,
+      topics: config.topics.map((t) => (t.code === code ? { ...topic, name } : t)),
+      managed: [...managed],
+    });
+    return { success: false, error: syncFailure(sync), sync };
   }
   await writeConfig({
     ...config,
