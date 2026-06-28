@@ -1,4 +1,4 @@
-import type { Group, Topic } from "./types";
+import type { Group, GroupsConfig, Topic } from "./types";
 
 const PW_PREFIX = "Hack-The-SDGs-Python@";
 
@@ -103,4 +103,13 @@ export function allGeneratedUsernames(config: { groups: Group[]; topics: Topic[]
     for (const name of expectedUsernamesForTopic(topic, config.groups)) names.add(name);
   }
   return names;
+}
+
+/**
+ * The set of usernames this system manages. For a legacy config (no `managed`
+ * field) we adopt every currently-expected generated name once, preserving the
+ * pre-registry behaviour; thereafter the stored registry is authoritative.
+ */
+export function loadManaged(config: GroupsConfig): Set<string> {
+  return config.managed ? new Set(config.managed) : allGeneratedUsernames(config);
 }

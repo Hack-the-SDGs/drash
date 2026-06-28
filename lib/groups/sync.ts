@@ -33,17 +33,28 @@ async function usernameMap(): Promise<Map<string, APIUser>> {
   return new Map(users.map((u) => [u.username, u]));
 }
 
+/**
+ * `managed` is the set of usernames this system owns. Destructive helpers only
+ * act on owned names; create adopts a name only when it doesn't already belong
+ * to an unrelated account (otherwise it reports a collision).
+ */
 async function createIfAbsent(
   username: string,
   password: string,
   map: Map<string, APIUser>,
   r: SyncResult,
+  managed: Set<string>,
   locked = false,
 ): Promise<void> {
-  if (map.has(username)) return;
+  if (map.has(username)) {
+    if (managed.has(username)) return; // already ours
+    r.errors.push(`名稱衝突 ${username}（已存在且非系統建立）`);
+    return;
+  }
   try {
     // playerName === username creates a same-named player alongside the user.
     await createUser({ username, password, playerName: username, isLocked: locked });
+    managed.add(username);
     r.created++;
   } catch (e) {
     r.errors.push(`建立 ${username}: ${errMsg(e)}`);
@@ -54,11 +65,17 @@ async function deleteIfPresent(
   username: string,
   map: Map<string, APIUser>,
   r: SyncResult,
+  managed: Set<string>,
 ): Promise<void> {
+  if (!managed.has(username)) return; // not ours — never touch
   const user = map.get(username);
-  if (!user) return;
+  if (!user) {
+    managed.delete(username); // already gone; drop from registry
+    return;
+  }
   try {
     await deleteUser(user.uuid);
+    managed.delete(username);
     r.deleted++;
   } catch (e) {
     r.errors.push(`刪除 ${username}: ${errMsg(e)}`);
@@ -70,7 +87,9 @@ async function setPassword(
   password: string,
   map: Map<string, APIUser>,
   r: SyncResult,
+  managed: Set<string>,
 ): Promise<void> {
+  if (!managed.has(username)) return;
   const user = map.get(username);
   if (!user) return;
   try {
@@ -86,7 +105,9 @@ async function setLock(
   locked: boolean,
   map: Map<string, APIUser>,
   r: SyncResult,
+  managed: Set<string>,
 ): Promise<void> {
+  if (!managed.has(username)) return;
   const user = map.get(username);
   if (!user || user.isLocked === locked) return;
   try {
@@ -100,11 +121,15 @@ async function setLock(
 /**
  * Apply a topic's bot-count change: delete accounts no longer expected and
  * create the newly added ones (matching the topic's open/locked state).
+ * Crossing the 1↔N boundary renames the bare account, which Drasl can't do in
+ * place, so the old user is recreated — acceptable here since these are derived
+ * bot accounts (players are recreated same-name, no OIDC, tokens are ephemeral).
  */
 export async function syncUpdateTopicBotCount(
   oldTopic: Topic,
   newTopic: Topic,
   groups: Group[],
+  managed: Set<string>,
 ): Promise<SyncResult> {
   const r = emptyResult();
   const map = await usernameMap();
@@ -113,11 +138,11 @@ export async function syncUpdateTopicBotCount(
   const newNames = new Set(newAccounts.map((a) => a.username));
 
   for (const name of oldNames) {
-    if (!newNames.has(name)) await deleteIfPresent(name, map, r);
+    if (!newNames.has(name)) await deleteIfPresent(name, map, r, managed);
   }
   for (const account of newAccounts) {
     if (!oldNames.has(account.username)) {
-      await createIfAbsent(account.username, account.password, map, r, !newTopic.open);
+      await createIfAbsent(account.username, account.password, map, r, managed, !newTopic.open);
     }
   }
   return r;
@@ -128,44 +153,56 @@ export async function syncSetTopicLock(
   topic: Topic,
   groups: Group[],
   locked: boolean,
+  managed: Set<string>,
 ): Promise<SyncResult> {
   const r = emptyResult();
   const map = await usernameMap();
   for (const username of expectedUsernamesForTopic(topic, groups)) {
-    await setLock(username, locked, map, r);
+    await setLock(username, locked, map, r, managed);
   }
   return r;
 }
 
 /** Create every account a new topic implies across all groups. */
-export async function syncCreateTopic(groups: Group[], topic: Topic): Promise<SyncResult> {
+export async function syncCreateTopic(
+  groups: Group[],
+  topic: Topic,
+  managed: Set<string>,
+): Promise<SyncResult> {
   const r = emptyResult();
   const map = await usernameMap();
   for (const g of groups) {
     for (const a of await accountsForTopicInGroup(g, topic)) {
-      await createIfAbsent(a.username, a.password, map, r);
+      await createIfAbsent(a.username, a.password, map, r, managed, !topic.open);
     }
   }
   return r;
 }
 
 /** Create every account a new group implies across all existing topics. */
-export async function syncCreateGroup(group: Group, topics: Topic[]): Promise<SyncResult> {
+export async function syncCreateGroup(
+  group: Group,
+  topics: Topic[],
+  managed: Set<string>,
+): Promise<SyncResult> {
   const r = emptyResult();
   const map = await usernameMap();
   for (const t of topics) {
     for (const a of await accountsForTopicInGroup(group, t)) {
-      await createIfAbsent(a.username, a.password, map, r);
+      await createIfAbsent(a.username, a.password, map, r, managed, !t.open);
     }
   }
   return r;
 }
 
-/** Delete the given usernames if they exist. */
-export async function syncDeleteUsernames(usernames: string[]): Promise<SyncResult> {
+/** Delete the given usernames if they exist and are ours. */
+export async function syncDeleteUsernames(
+  usernames: string[],
+  managed: Set<string>,
+): Promise<SyncResult> {
   const r = emptyResult();
   const map = await usernameMap();
-  for (const name of usernames) await deleteIfPresent(name, map, r);
+  for (const name of usernames) await deleteIfPresent(name, map, r, managed);
   return r;
 }
 
@@ -174,11 +211,13 @@ export async function syncDeleteUsernames(usernames: string[]): Promise<SyncResu
  * Personal-topic usernames don't contain the group number, so only their
  * password changes (in-place PATCH). Group-topic usernames do change, so the
  * old user is deleted and a new one created (username is immutable in Drasl).
+ * The replacement inherits the topic's open/locked state.
  */
 export async function syncRenumberGroup(
   oldNumber: string,
   group: Group,
   topics: Topic[],
+  managed: Set<string>,
 ): Promise<SyncResult> {
   const r = emptyResult();
   const map = await usernameMap();
@@ -190,15 +229,18 @@ export async function syncRenumberGroup(
           await personalPassword(group.number, m),
           map,
           r,
+          managed,
         );
       }
     } else {
-      await deleteIfPresent(groupUsername(oldNumber, t.code), map, r);
+      await deleteIfPresent(groupUsername(oldNumber, t.code), map, r, managed);
       await createIfAbsent(
         groupUsername(group.number, t.code),
         await groupPassword(group.number),
         map,
         r,
+        managed,
+        !t.open,
       );
     }
   }
@@ -209,15 +251,25 @@ export async function syncRenumberGroup(
  * Cascade membership changes. Added members get a user for every personal
  * topic; removed members lose theirs. Group topics are per-group and unaffected.
  * (Changing a member's number arrives here as remove-old + add-new.)
+ *
+ * Deletes run before creates so a name freed here is gone before any add.
+ * ponytail: cross-request races (two admins moving the same member at once) are
+ * inherent to KV's lack of CAS — move group config to D1 if that matters.
  */
 export async function syncUpdateMembers(
   group: Group,
   addedMembers: string[],
   removedMembers: string[],
   personalTopics: Topic[],
+  managed: Set<string>,
 ): Promise<SyncResult> {
   const r = emptyResult();
   const map = await usernameMap();
+  for (const t of personalTopics) {
+    for (const m of removedMembers) {
+      await deleteIfPresent(personalUsername(m, t.code), map, r, managed);
+    }
+  }
   for (const t of personalTopics) {
     for (const m of addedMembers) {
       await createIfAbsent(
@@ -225,10 +277,9 @@ export async function syncUpdateMembers(
         await personalPassword(group.number, m),
         map,
         r,
+        managed,
+        !t.open,
       );
-    }
-    for (const m of removedMembers) {
-      await deleteIfPresent(personalUsername(m, t.code), map, r);
     }
   }
   return r;

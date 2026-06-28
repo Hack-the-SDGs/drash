@@ -35,7 +35,12 @@ import {
   setTopicOpenAction,
   type TopicActionResult,
 } from "@/lib/actions/topics";
-import type { Topic, TopicType } from "@/lib/groups/types";
+import { MAX_BOT_COUNT, type Topic, type TopicType } from "@/lib/groups/types";
+
+/** Valid bot count input: an integer in [1, MAX_BOT_COUNT]. */
+function isBotCountValid(value: string): boolean {
+  return /^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= MAX_BOT_COUNT;
+}
 
 export interface TopicStat {
   code: string;
@@ -88,9 +93,7 @@ export function TopicManager({ topics, stats }: TopicManagerProps) {
         toast.error(result.error ?? dict.errors.unknown);
         return;
       }
-      toast.success(
-        result.sync ? successMsg.replace("{created}", String(result.sync.created)) : successMsg,
-      );
+      toast.success(successMsg.replace("{created}", String(result.sync?.created ?? 0)));
       if (result.sync && result.sync.errors.length > 0) {
         toast.error(dict.groups.syncErrors.replace("{count}", String(result.sync.errors.length)));
       }
@@ -239,7 +242,7 @@ function CreateTopicDialog({
     onOpenChange(next);
   }
 
-  const botCountValid = /^\d+$/.test(botCount) && Number(botCount) >= 1;
+  const botCountValid = isBotCountValid(botCount);
 
   const options: { value: TopicType; label: string; hint: string }[] = [
     { value: "personal", label: dict.topics.personal, hint: dict.topics.personalHint },
@@ -337,7 +340,7 @@ function EditTopicDialog({
   const [name, setName] = useState(topic?.name ?? "");
   const [botCount, setBotCount] = useState(String(topic?.botCount ?? 1));
 
-  const botCountValid = /^\d+$/.test(botCount) && Number(botCount) >= 1;
+  const botCountValid = isBotCountValid(botCount);
 
   return (
     <Dialog open={topic !== null} onOpenChange={(open) => !open && onClose()}>
