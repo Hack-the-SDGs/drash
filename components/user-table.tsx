@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Table,
   TableBody,
@@ -72,6 +73,7 @@ interface UserTableProps {
 
 export function UserTable({ users, lang, currentUserUuid, viewerRole, userRoles }: UserTableProps) {
   const dict = useDict();
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [isPending, startTransition] = useTransition();
   const [deleteTarget, setDeleteTarget] = useState<APIUser | null>(null);
@@ -274,15 +276,13 @@ export function UserTable({ users, lang, currentUserUuid, viewerRole, userRoles 
                 return (
                   <TableRow
                     key={user.uuid}
-                    className={
-                      isSelected
-                        ? "bg-primary/10"
-                        : isSelf
-                          ? "bg-primary/5"
-                          : undefined
-                    }
+                    className={`${
+                      isSelected ? "bg-primary/10" : isSelf ? "bg-primary/5" : ""
+                    }${canEdit ? " cursor-pointer" : ""}`}
                     onClick={(e) => {
-                      if (canLock) handleClick(user.uuid, e);
+                      // Ctrl/Shift click selects; plain click opens the editor.
+                      if (canLock && handleClick(user.uuid, e)) return;
+                      if (canEdit) router.push(`/${lang}/admin/users/${user.uuid}`);
                     }}
                   >
                     <TableCell>
@@ -337,7 +337,7 @@ export function UserTable({ users, lang, currentUserUuid, viewerRole, userRoles 
                       )}
                     </TableCell>
                     <TableCell>{user.players?.length ?? 0}</TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger
                           render={<Button variant="ghost" size="icon-sm" />}

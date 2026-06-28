@@ -25,7 +25,7 @@ export default async function AdminsPage(
           <p className="text-muted-foreground">{dict.admins.description}</p>
         </div>
       </div>
-      <AdminManager users={users} currentUserUuid={session.uuid} />
+      <AdminManager users={users} currentUserUuid={session.uuid} lang={lang} />
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { LazyPlayerHead } from "@/components/lazy-player-head";
 import { useDict } from "@/components/dict-provider";
@@ -19,11 +20,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PencilIcon, Trash2Icon, SearchIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, XIcon } from "lucide-react";
+import { Trash2Icon, SearchIcon, PlusIcon, ArrowUpIcon, ArrowDownIcon, XIcon } from "lucide-react";
 import { useSortable } from "@/hooks/use-sortable";
 import { useSelection } from "@/hooks/use-selection";
 import { canDeletePlayer } from "@/lib/permissions";
 import type { APIPlayer, APIUser, Role } from "@/lib/types";
+
+function SortIcon({ active, direction }: { active: boolean; direction: "asc" | "desc" }) {
+  if (!active) return null;
+  return direction === "asc" ? (
+    <ArrowUpIcon className="inline size-3 ml-1" />
+  ) : (
+    <ArrowDownIcon className="inline size-3 ml-1" />
+  );
+}
 
 interface PlayerTableProps {
   players: APIPlayer[];
@@ -38,6 +48,7 @@ interface PlayerTableProps {
 
 export function PlayerTable({ players, userMap, userRoleMap, users, lang, viewerRole, viewerUsername }: PlayerTableProps) {
   const dict = useDict();
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<APIPlayer | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -101,13 +112,6 @@ export function PlayerTable({ players, userMap, userRoleMap, users, lang, viewer
     });
   }
 
-  function SortIcon({ colKey }: { colKey: string }) {
-    if (sortKey !== colKey) return null;
-    return direction === "asc"
-      ? <ArrowUpIcon className="inline size-3 ml-1" />
-      : <ArrowDownIcon className="inline size-3 ml-1" />;
-  }
-
   return (
     <div className={`space-y-4${selected.size > 0 ? " select-none" : ""}`}>
       <div className="flex items-center gap-3">
@@ -140,7 +144,7 @@ export function PlayerTable({ players, userMap, userRoleMap, users, lang, viewer
                   onClick={() => toggleSort("name")}
                 >
                   {dict.player.name}
-                  <SortIcon colKey="name" />
+                  <SortIcon active={sortKey === "name"} direction={direction} />
                 </button>
               </TableHead>
               <TableHead>{dict.player.uuid}</TableHead>
@@ -151,7 +155,7 @@ export function PlayerTable({ players, userMap, userRoleMap, users, lang, viewer
                   onClick={() => toggleSort("owner")}
                 >
                   {dict.player.owner}
-                  <SortIcon colKey="owner" />
+                  <SortIcon active={sortKey === "owner"} direction={direction} />
                 </button>
               </TableHead>
               <TableHead>
@@ -161,7 +165,7 @@ export function PlayerTable({ players, userMap, userRoleMap, users, lang, viewer
                   onClick={() => toggleSort("skinModel")}
                 >
                   {dict.player.skinModel}
-                  <SortIcon colKey="skinModel" />
+                  <SortIcon active={sortKey === "skinModel"} direction={direction} />
                 </button>
               </TableHead>
               <TableHead>{dict.common.actions}</TableHead>
@@ -184,9 +188,11 @@ export function PlayerTable({ players, userMap, userRoleMap, users, lang, viewer
                 return (
                   <TableRow
                     key={player.uuid}
-                    className={isSelected ? "bg-primary/10" : undefined}
+                    className={`${isSelected ? "bg-primary/10" : ""}${manageable ? " cursor-pointer" : ""}`}
                     onClick={(e) => {
-                      if (manageable) handleClick(player.uuid, e);
+                      // Ctrl/Shift click selects; plain click opens the editor.
+                      if (manageable && handleClick(player.uuid, e)) return;
+                      if (manageable) router.push(`/${lang}/admin/players/${player.uuid}`);
                     }}
                   >
                     <TableCell>
@@ -210,13 +216,10 @@ export function PlayerTable({ players, userMap, userRoleMap, users, lang, viewer
                     <TableCell className="font-mono text-xs">
                       {player.uuid}
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <Link
                         href={`/${lang}/admin/users/${player.userUuid}`}
                         className={`hover:underline${roleColor ? ` ${roleColor}` : ""}`}
-                        onClick={(e) => {
-                          if (e.metaKey || e.ctrlKey || e.shiftKey) e.preventDefault();
-                        }}
                       >
                         {userMap[player.userUuid] ?? player.userUuid}
                       </Link>
@@ -224,17 +227,9 @@ export function PlayerTable({ players, userMap, userRoleMap, users, lang, viewer
                     <TableCell>
                       <Badge variant="secondary">{player.skinModel === "slim" ? dict.player.slim : dict.player.classic}</Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       {manageable ? (
                         <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            nativeButton={false}
-                            render={<Link href={`/${lang}/admin/players/${player.uuid}`} />}
-                          >
-                            <PencilIcon className="size-4" />
-                          </Button>
                           <Button
                             variant="ghost"
                             size="icon-sm"
