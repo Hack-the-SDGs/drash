@@ -31,30 +31,57 @@ export interface GeneratedAccount {
   password: string;
 }
 
+/**
+ * Expand a base username into one entry per bot. A count of 1 keeps the bare
+ * name (legacy behaviour); >1 appends `_1`, `_2`, … (e.g. G1_swim_1, G1_swim_2).
+ */
+export function expandBots(base: string, botCount: number): string[] {
+  if (botCount <= 1) return [base];
+  return Array.from({ length: botCount }, (_, i) => `${base}_${i + 1}`);
+}
+
 /** Accounts a single topic implies for one group (with computed passwords). */
 export async function accountsForTopicInGroup(
   group: Group,
   topic: Topic,
 ): Promise<GeneratedAccount[]> {
   if (topic.type === "group") {
-    return [
-      { username: groupUsername(group.number, topic.code), password: await groupPassword(group.number) },
-    ];
+    const password = await groupPassword(group.number);
+    return expandBots(groupUsername(group.number, topic.code), topic.botCount).map((username) => ({
+      username,
+      password,
+    }));
   }
-  return Promise.all(
-    group.members.map(async (m) => ({
-      username: personalUsername(m, topic.code),
-      password: await personalPassword(group.number, m),
-    })),
-  );
+  const accounts: GeneratedAccount[] = [];
+  for (const m of group.members) {
+    const password = await personalPassword(group.number, m);
+    for (const username of expandBots(personalUsername(m, topic.code), topic.botCount)) {
+      accounts.push({ username, password });
+    }
+  }
+  return accounts;
+}
+
+/** All accounts a single topic implies across the given groups. */
+export async function accountsForTopic(
+  groups: Group[],
+  topic: Topic,
+): Promise<GeneratedAccount[]> {
+  const accounts: GeneratedAccount[] = [];
+  for (const group of groups) {
+    accounts.push(...(await accountsForTopicInGroup(group, topic)));
+  }
+  return accounts;
 }
 
 /** All usernames a group is expected to own across the given topics (no passwords). */
 export function expectedUsernamesForGroup(group: Group, topics: Topic[]): string[] {
   const names: string[] = [];
   for (const t of topics) {
-    if (t.type === "group") names.push(groupUsername(group.number, t.code));
-    else for (const m of group.members) names.push(personalUsername(m, t.code));
+    if (t.type === "group") names.push(...expandBots(groupUsername(group.number, t.code), t.botCount));
+    else
+      for (const m of group.members)
+        names.push(...expandBots(personalUsername(m, t.code), t.botCount));
   }
   return names;
 }
@@ -63,8 +90,8 @@ export function expectedUsernamesForGroup(group: Group, topics: Topic[]): string
 export function expectedUsernamesForTopic(topic: Topic, groups: Group[]): string[] {
   const names: string[] = [];
   for (const g of groups) {
-    if (topic.type === "group") names.push(groupUsername(g.number, topic.code));
-    else for (const m of g.members) names.push(personalUsername(m, topic.code));
+    if (topic.type === "group") names.push(...expandBots(groupUsername(g.number, topic.code), topic.botCount));
+    else for (const m of g.members) names.push(...expandBots(personalUsername(m, topic.code), topic.botCount));
   }
   return names;
 }

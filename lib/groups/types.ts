@@ -15,6 +15,8 @@ export interface Topic {
   type: TopicType;
   /** When false, the topic's generated accounts are locked. Defaults to open. */
   open: boolean;
+  /** Bots per group/member. 1 = bare name; >1 appends _1, _2, … Min 1. */
+  botCount: number;
 }
 
 export interface GroupsConfig {

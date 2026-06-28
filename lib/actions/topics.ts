@@ -7,6 +7,7 @@ import {
   syncCreateTopic,
   syncDeleteUsernames,
   syncSetTopicLock,
+  syncUpdateTopicBotCount,
   type SyncResult,
 } from "@/lib/groups/sync";
 import { expectedUsernamesForTopic } from "@/lib/groups/naming";
@@ -28,6 +29,7 @@ export async function createTopicAction(
   rawName: string,
   rawCode: string,
   type: TopicType,
+  botCount: number,
 ): Promise<TopicActionResult> {
   const denied = await requireAdmin();
   if (denied) return fail(denied);
@@ -37,11 +39,12 @@ export async function createTopicAction(
   if (!name) return fail("題目名稱必填");
   if (!CODE.test(code)) return fail("題目代號只能包含小寫英文、數字、底線");
   if (type !== "personal" && type !== "group") return fail("題目類型不正確");
+  if (!Number.isInteger(botCount) || botCount < 1) return fail("機器人數量至少為 1");
 
   const config = await readConfig();
   if (config.topics.some((t) => t.code === code)) return fail(`題目代號 ${code} 已存在`);
 
-  const topic: Topic = { name, code, type, open: true };
+  const topic: Topic = { name, code, type, open: true, botCount };
   await writeConfig({ ...config, topics: [...config.topics, topic] });
   const sync = await syncCreateTopic(config.groups, topic);
   updateTag("users");
@@ -69,25 +72,35 @@ export async function setTopicOpenAction(
   return { success: true, sync };
 }
 
-export async function updateTopicNameAction(
+export async function updateTopicAction(
   code: string,
   rawName: string,
+  botCount: number,
 ): Promise<TopicActionResult> {
   const denied = await requireAdmin();
   if (denied) return fail(denied);
 
   const name = rawName.trim();
   if (!name) return fail("題目名稱必填");
+  if (!Number.isInteger(botCount) || botCount < 1) return fail("機器人數量至少為 1");
 
   const config = await readConfig();
   const topic = config.topics.find((t) => t.code === code);
   if (!topic) return fail(`找不到題目 ${code}`);
 
+  const updated: Topic = { ...topic, name, botCount };
   await writeConfig({
     ...config,
-    topics: config.topics.map((t) => (t.code === code ? { ...t, name } : t)),
+    topics: config.topics.map((t) => (t.code === code ? updated : t)),
   });
-  return { success: true };
+
+  // Changing bot count adds/removes the suffixed accounts.
+  let sync: SyncResult | undefined;
+  if (topic.botCount !== botCount) {
+    sync = await syncUpdateTopicBotCount(topic, updated, config.groups);
+    updateTag("users");
+  }
+  return { success: true, sync };
 }
 
 export async function deleteTopicAction(
