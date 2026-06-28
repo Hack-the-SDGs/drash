@@ -212,6 +212,7 @@ export function GroupManager({ groups, stats }: GroupManagerProps) {
       />
 
       <DeleteCascadeDialog
+        key={deleteTarget?.number ?? "none"}
         open={deleteTarget !== null}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
         title={dict.groups.deleteGroup}

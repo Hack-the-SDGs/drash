@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -40,12 +40,9 @@ export function DeleteCascadeDialog({
   onConfirm,
 }: DeleteCascadeDialogProps) {
   const confirmRef = useRef<HTMLButtonElement>(null);
+  // Defaults to checked. Parents pass a `key` tied to the delete target so this
+  // component remounts (and the checkbox resets) for each new deletion.
   const [deleteUsers, setDeleteUsers] = useState(true);
-
-  // Reset the checkbox to checked every time the dialog opens.
-  useEffect(() => {
-    if (open) setDeleteUsers(true);
-  }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
