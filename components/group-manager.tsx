@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { DeleteCascadeDialog } from "@/components/delete-cascade-dialog";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { PlusIcon, Trash2Icon, UsersIcon, HashIcon } from "lucide-react";
 import {
   createGroupAction,
@@ -46,6 +46,11 @@ function parseMembers(raw: string): string[] {
     .filter(Boolean);
 }
 
+/** Keep only digits — used to block non-numeric input in number fields. */
+function digitsOnly(raw: string): string {
+  return raw.replace(/\D/g, "");
+}
+
 export function GroupManager({ groups, stats }: GroupManagerProps) {
   const dict = useDict();
   const router = useRouter();
@@ -57,6 +62,8 @@ export function GroupManager({ groups, stats }: GroupManagerProps) {
   const [deleteTarget, setDeleteTarget] = useState<Group | null>(null);
 
   const statByNumber = new Map(stats.map((s) => [s.number, s]));
+  // Display groups ordered by number, smallest first.
+  const sortedGroups = [...groups].sort((a, b) => Number(a.number) - Number(b.number));
 
   /** Run an action, surface the result, and refresh the server data on success. */
   function run(action: () => Promise<GroupActionResult>, onDone: () => void) {
@@ -94,25 +101,25 @@ export function GroupManager({ groups, stats }: GroupManagerProps) {
         </Button>
       </div>
 
-      {groups.length === 0 ? (
+      {sortedGroups.length === 0 ? (
         <p className="py-12 text-center text-muted-foreground">{dict.groups.noGroups}</p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {groups.map((group) => {
+          {sortedGroups.map((group) => {
             const stat = statByNumber.get(group.number);
             const userCount = stat?.presentUsers.length ?? 0;
             return (
-              <Card key={group.number} className="gap-3 transition-shadow hover:shadow-md">
+              <Card key={group.number} className="gap-3">
                 <CardHeader className="flex flex-row items-start justify-between gap-2">
                   {/* Title -> renumber */}
                   <button
                     type="button"
                     onClick={() => setRenumberTarget(group)}
-                    className="group/title -m-1 rounded-md p-1 text-left transition-colors hover:bg-muted"
+                    className="-m-1 cursor-pointer rounded-md p-1 text-left"
                     title={dict.groups.renumber}
                   >
                     <span className="flex items-center gap-1 text-2xl font-bold tracking-tight">
-                      <HashIcon className="size-5 text-muted-foreground group-hover/title:text-foreground" />
+                      <HashIcon className="size-5 text-muted-foreground" />
                       {group.number}
                     </span>
                   </button>
@@ -126,11 +133,11 @@ export function GroupManager({ groups, stats }: GroupManagerProps) {
                   </Button>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {/* Members -> edit members; hover reveals the full user list */}
+                  {/* Members -> edit members */}
                   <button
                     type="button"
                     onClick={() => setMembersTarget(group)}
-                    className="group/members relative -mx-1 block w-full rounded-md px-1 py-1 text-left transition-colors hover:bg-muted"
+                    className="-mx-1 block w-full cursor-pointer rounded-md px-1 py-1 text-left"
                     title={dict.groups.editMembers}
                   >
                     <div className="mb-1.5 text-xs font-medium text-muted-foreground">
@@ -147,26 +154,9 @@ export function GroupManager({ groups, stats }: GroupManagerProps) {
                         ))
                       )}
                     </div>
-                    {/* Hover panel: full generated user list */}
-                    <div className="invisible absolute left-0 top-full z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border bg-popover p-2 text-xs shadow-lg ring-1 ring-foreground/10 group-hover/members:visible">
-                      <div className="mb-1 font-medium">{dict.groups.fullUserList}</div>
-                      {stat && stat.presentUsers.length > 0 ? (
-                        <ul className="space-y-0.5 font-mono">
-                          {stat.presentUsers.map((u) => (
-                            <li key={u}>{u}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <span className="text-muted-foreground">{dict.groups.noUsers}</span>
-                      )}
-                    </div>
                   </button>
 
-                  {/* Totals; hover shows player count (equals user count) */}
-                  <div
-                    className="group/count flex items-center gap-2 text-sm"
-                    title={`${dict.groups.playerCount}: ${userCount}`}
-                  >
+                  <div className="flex items-center gap-2 text-sm">
                     <UsersIcon className="size-4 text-muted-foreground" />
                     <span className="text-muted-foreground">{dict.groups.totalUsers}</span>
                     <span className="ml-auto font-semibold tabular-nums">{userCount}</span>
@@ -188,8 +178,9 @@ export function GroupManager({ groups, stats }: GroupManagerProps) {
       />
 
       <RenumberDialog
+        key={`renumber-${renumberTarget?.number ?? "none"}`}
         group={renumberTarget}
-        onOpenChange={(open) => !open && setRenumberTarget(null)}
+        onClose={() => setRenumberTarget(null)}
         pending={isPending}
         onSubmit={(newNumber) =>
           run(
@@ -200,8 +191,9 @@ export function GroupManager({ groups, stats }: GroupManagerProps) {
       />
 
       <EditMembersDialog
+        key={`members-${membersTarget?.number ?? "none"}`}
         group={membersTarget}
-        onOpenChange={(open) => !open && setMembersTarget(null)}
+        onClose={() => setMembersTarget(null)}
         pending={isPending}
         onSubmit={(members) =>
           run(
@@ -211,21 +203,17 @@ export function GroupManager({ groups, stats }: GroupManagerProps) {
         }
       />
 
-      <DeleteCascadeDialog
-        key={deleteTarget?.number ?? "none"}
+      <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
         title={dict.groups.deleteGroup}
         description={dict.groups.deleteGroupConfirm.replace("{number}", deleteTarget?.number ?? "")}
-        cascadeLabel={dict.groups.deleteGeneratedUsers}
         confirmLabel={dict.common.delete}
         cancelLabel={dict.common.cancel}
+        destructive
         pending={isPending}
-        onConfirm={(deleteUsers) =>
-          run(
-            () => deleteGroupAction(deleteTarget!.number, deleteUsers),
-            () => setDeleteTarget(null),
-          )
+        onConfirm={() =>
+          run(() => deleteGroupAction(deleteTarget!.number, true), () => setDeleteTarget(null))
         }
       />
     </div>
@@ -270,7 +258,7 @@ function CreateGroupDialog({
               id="group-number"
               inputMode="numeric"
               value={number}
-              onChange={(e) => setNumber(e.target.value)}
+              onChange={(e) => setNumber(digitsOnly(e.target.value))}
               placeholder={dict.groups.groupNumberPlaceholder}
             />
           </div>
@@ -278,8 +266,9 @@ function CreateGroupDialog({
             <Label htmlFor="group-members">{dict.groups.members}</Label>
             <Input
               id="group-members"
+              inputMode="numeric"
               value={members}
-              onChange={(e) => setMembers(e.target.value)}
+              onChange={(e) => setMembers(e.target.value.replace(/[^\d\s,]/g, ""))}
               placeholder={dict.groups.membersPlaceholder}
             />
           </div>
@@ -302,26 +291,21 @@ function CreateGroupDialog({
 
 function RenumberDialog({
   group,
-  onOpenChange,
+  onClose,
   pending,
   onSubmit,
 }: {
   group: Group | null;
-  onOpenChange: (open: boolean) => void;
+  onClose: () => void;
   pending: boolean;
   onSubmit: (newNumber: string) => void;
 }) {
   const dict = useDict();
-  const [value, setValue] = useState("");
+  // Prefilled from the target (component remounts per target via key).
+  const [value, setValue] = useState(group?.number ?? "");
 
   return (
-    <Dialog
-      open={group !== null}
-      onOpenChange={(open) => {
-        if (open && group) setValue(group.number);
-        onOpenChange(open);
-      }}
-    >
+    <Dialog open={group !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>{dict.groups.renumber}</DialogTitle>
@@ -333,12 +317,12 @@ function RenumberDialog({
             id="renumber-input"
             inputMode="numeric"
             value={value}
-            onChange={(e) => setValue(e.target.value)}
+            onChange={(e) => setValue(digitsOnly(e.target.value))}
             autoFocus
           />
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
+          <Button variant="outline" onClick={onClose} disabled={pending}>
             {dict.common.cancel}
           </Button>
           <Button onClick={() => onSubmit(value)} disabled={pending || !value.trim()}>
@@ -352,26 +336,21 @@ function RenumberDialog({
 
 function EditMembersDialog({
   group,
-  onOpenChange,
+  onClose,
   pending,
   onSubmit,
 }: {
   group: Group | null;
-  onOpenChange: (open: boolean) => void;
+  onClose: () => void;
   pending: boolean;
   onSubmit: (members: string[]) => void;
 }) {
   const dict = useDict();
-  const [value, setValue] = useState("");
+  // Prefilled with the group's current members (remounts per target via key).
+  const [value, setValue] = useState(group ? group.members.join(" ") : "");
 
   return (
-    <Dialog
-      open={group !== null}
-      onOpenChange={(open) => {
-        if (open && group) setValue(group.members.join(" "));
-        onOpenChange(open);
-      }}
-    >
+    <Dialog open={group !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>{dict.groups.editMembers}</DialogTitle>
@@ -381,14 +360,15 @@ function EditMembersDialog({
           <Label htmlFor="members-input">{dict.groups.members}</Label>
           <Input
             id="members-input"
+            inputMode="numeric"
             value={value}
-            onChange={(e) => setValue(e.target.value)}
+            onChange={(e) => setValue(e.target.value.replace(/[^\d\s,]/g, ""))}
             placeholder={dict.groups.membersPlaceholder}
             autoFocus
           />
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
+          <Button variant="outline" onClick={onClose} disabled={pending}>
             {dict.common.cancel}
           </Button>
           <Button onClick={() => onSubmit(parseMembers(value))} disabled={pending}>

@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { DeleteCascadeDialog } from "@/components/delete-cascade-dialog";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
   Table,
   TableBody,
@@ -26,7 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PlusIcon, PencilIcon, Trash2Icon } from "lucide-react";
+import { PlusIcon, Trash2Icon } from "lucide-react";
 import {
   createTopicAction,
   updateTopicNameAction,
@@ -94,12 +94,16 @@ export function TopicManager({ topics, stats }: TopicManagerProps) {
                 <TableHead>{dict.topics.codeColumn}</TableHead>
                 <TableHead>{dict.topics.type}</TableHead>
                 <TableHead className="text-right">{dict.topics.accountCount}</TableHead>
-                <TableHead>{dict.common.actions}</TableHead>
+                <TableHead className="w-[60px]">{dict.common.actions}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {topics.map((topic) => (
-                <TableRow key={topic.code}>
+                <TableRow
+                  key={topic.code}
+                  className="cursor-pointer"
+                  onClick={() => setRenameTarget(topic)}
+                >
                   <TableCell className="font-medium">{topic.name}</TableCell>
                   <TableCell className="font-mono text-xs">{topic.code}</TableCell>
                   <TableCell>
@@ -110,25 +114,15 @@ export function TopicManager({ topics, stats }: TopicManagerProps) {
                   <TableCell className="text-right tabular-nums">
                     {countByCode.get(topic.code) ?? 0}
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => setRenameTarget(topic)}
-                        disabled={isPending}
-                      >
-                        <PencilIcon className="size-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => setDeleteTarget(topic)}
-                        disabled={isPending}
-                      >
-                        <Trash2Icon className="size-4 text-destructive" />
-                      </Button>
-                    </div>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => setDeleteTarget(topic)}
+                      disabled={isPending}
+                    >
+                      <Trash2Icon className="size-4 text-destructive" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -149,8 +143,9 @@ export function TopicManager({ topics, stats }: TopicManagerProps) {
       />
 
       <RenameTopicDialog
+        key={`rename-${renameTarget?.code ?? "none"}`}
         topic={renameTarget}
-        onOpenChange={(open) => !open && setRenameTarget(null)}
+        onClose={() => setRenameTarget(null)}
         pending={isPending}
         onSubmit={(name) =>
           run(
@@ -161,19 +156,18 @@ export function TopicManager({ topics, stats }: TopicManagerProps) {
         }
       />
 
-      <DeleteCascadeDialog
-        key={deleteTarget?.code ?? "none"}
+      <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
         title={dict.topics.deleteTopic}
         description={dict.topics.deleteTopicConfirm.replace("{name}", deleteTarget?.name ?? "")}
-        cascadeLabel={dict.topics.deleteGeneratedUsers}
         confirmLabel={dict.common.delete}
         cancelLabel={dict.common.cancel}
+        destructive
         pending={isPending}
-        onConfirm={(deleteUsers) =>
+        onConfirm={() =>
           run(
-            () => deleteTopicAction(deleteTarget!.code, deleteUsers),
+            () => deleteTopicAction(deleteTarget!.code, true),
             dict.topics.deleted,
             () => setDeleteTarget(null),
           )
@@ -249,7 +243,7 @@ function CreateTopicDialog({
                   type="button"
                   onClick={() => setType(o.value)}
                   className={cn(
-                    "rounded-lg border p-3 text-left transition-colors",
+                    "cursor-pointer rounded-lg border p-3 text-left transition-colors",
                     type === o.value
                       ? "border-primary bg-primary/5 ring-1 ring-primary"
                       : "hover:bg-muted",
@@ -280,26 +274,21 @@ function CreateTopicDialog({
 
 function RenameTopicDialog({
   topic,
-  onOpenChange,
+  onClose,
   pending,
   onSubmit,
 }: {
   topic: Topic | null;
-  onOpenChange: (open: boolean) => void;
+  onClose: () => void;
   pending: boolean;
   onSubmit: (name: string) => void;
 }) {
   const dict = useDict();
-  const [value, setValue] = useState("");
+  // Prefilled with the topic's current name (remounts per target via key).
+  const [value, setValue] = useState(topic?.name ?? "");
 
   return (
-    <Dialog
-      open={topic !== null}
-      onOpenChange={(open) => {
-        if (open && topic) setValue(topic.name);
-        onOpenChange(open);
-      }}
-    >
+    <Dialog open={topic !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>{dict.topics.rename}</DialogTitle>
@@ -315,7 +304,7 @@ function RenameTopicDialog({
           />
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
+          <Button variant="outline" onClick={onClose} disabled={pending}>
             {dict.common.cancel}
           </Button>
           <Button onClick={() => onSubmit(value)} disabled={pending || !value.trim()}>
