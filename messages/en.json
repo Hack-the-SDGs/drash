@@ -265,6 +265,9 @@
     "deleted": "Topic removed",
     "renamed": "Topic name updated",
     "accountCount": "Accounts",
-    "codeColumn": "Code"
+    "codeColumn": "Code",
+    "open": "Open",
+    "opened": "Topic opened ({count} accounts unlocked)",
+    "closed": "Topic closed ({count} accounts locked)"
   }
 }

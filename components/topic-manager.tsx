@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -31,6 +32,7 @@ import {
   createTopicAction,
   updateTopicNameAction,
   deleteTopicAction,
+  setTopicOpenAction,
   type TopicActionResult,
 } from "@/lib/actions/topics";
 import type { Topic, TopicType } from "@/lib/groups/types";
@@ -53,8 +55,31 @@ export function TopicManager({ topics, stats }: TopicManagerProps) {
   const [createOpen, setCreateOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<Topic | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Topic | null>(null);
+  // Code of the topic whose open/closed switch is currently applying.
+  const [togglingCode, setTogglingCode] = useState<string | null>(null);
 
   const countByCode = new Map(stats.map((s) => [s.code, s.accountCount]));
+
+  /** Open/close a topic: locks or unlocks its accounts. Disabled until done. */
+  function handleToggleOpen(topic: Topic, open: boolean) {
+    setTogglingCode(topic.code);
+    startTransition(async () => {
+      const result = await setTopicOpenAction(topic.code, open);
+      if (!result.success) {
+        toast.error(result.error ?? dict.errors.unknown);
+      } else {
+        const count = result.sync?.updated ?? 0;
+        toast.success(
+          (open ? dict.topics.opened : dict.topics.closed).replace("{count}", String(count)),
+        );
+        if (result.sync && result.sync.errors.length > 0) {
+          toast.error(dict.groups.syncErrors.replace("{count}", String(result.sync.errors.length)));
+        }
+      }
+      setTogglingCode(null);
+      router.refresh();
+    });
+  }
 
   function run(action: () => Promise<TopicActionResult>, successMsg: string, onDone: () => void) {
     startTransition(async () => {
@@ -94,6 +119,7 @@ export function TopicManager({ topics, stats }: TopicManagerProps) {
                 <TableHead>{dict.topics.codeColumn}</TableHead>
                 <TableHead>{dict.topics.type}</TableHead>
                 <TableHead className="text-right">{dict.topics.accountCount}</TableHead>
+                <TableHead>{dict.topics.open}</TableHead>
                 <TableHead className="w-[60px]">{dict.common.actions}</TableHead>
               </TableRow>
             </TableHeader>
@@ -113,6 +139,13 @@ export function TopicManager({ topics, stats }: TopicManagerProps) {
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {countByCode.get(topic.code) ?? 0}
+                  </TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <Switch
+                      checked={topic.open}
+                      disabled={togglingCode === topic.code}
+                      onCheckedChange={(open) => handleToggleOpen(topic, open)}
+                    />
                   </TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <Button

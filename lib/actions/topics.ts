@@ -3,7 +3,12 @@
 import { updateTag } from "next/cache";
 import { readConfig, writeConfig } from "@/lib/groups/store";
 import { requireAdmin } from "@/lib/groups/guard";
-import { syncCreateTopic, syncDeleteUsernames, type SyncResult } from "@/lib/groups/sync";
+import {
+  syncCreateTopic,
+  syncDeleteUsernames,
+  syncSetTopicLock,
+  type SyncResult,
+} from "@/lib/groups/sync";
 import { expectedUsernamesForTopic } from "@/lib/groups/naming";
 import type { Topic, TopicType } from "@/lib/groups/types";
 
@@ -36,9 +41,30 @@ export async function createTopicAction(
   const config = await readConfig();
   if (config.topics.some((t) => t.code === code)) return fail(`題目代號 ${code} 已存在`);
 
-  const topic: Topic = { name, code, type };
+  const topic: Topic = { name, code, type, open: true };
   await writeConfig({ ...config, topics: [...config.topics, topic] });
   const sync = await syncCreateTopic(config.groups, topic);
+  updateTag("users");
+  return { success: true, sync };
+}
+
+export async function setTopicOpenAction(
+  code: string,
+  open: boolean,
+): Promise<TopicActionResult> {
+  const denied = await requireAdmin();
+  if (denied) return fail(denied);
+
+  const config = await readConfig();
+  const topic = config.topics.find((t) => t.code === code);
+  if (!topic) return fail(`找不到題目 ${code}`);
+
+  await writeConfig({
+    ...config,
+    topics: config.topics.map((t) => (t.code === code ? { ...t, open } : t)),
+  });
+  // open -> unlock accounts; closed -> lock accounts.
+  const sync = await syncSetTopicLock(topic, config.groups, !open);
   updateTag("users");
   return { success: true, sync };
 }

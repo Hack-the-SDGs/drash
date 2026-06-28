@@ -265,6 +265,9 @@
     "deleted": "題目已移除",
     "renamed": "題目名稱已更新",
     "accountCount": "帳號數量",
-    "codeColumn": "代號"
+    "codeColumn": "代號",
+    "open": "開放",
+    "opened": "題目已開放（解鎖 {count} 個帳號）",
+    "closed": "題目已關閉（鎖定 {count} 個帳號）"
   }
 }

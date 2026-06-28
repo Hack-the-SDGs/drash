@@ -5,6 +5,7 @@ import type { APIUser } from "@/lib/types";
 import type { Group, Topic } from "./types";
 import {
   accountsForTopicInGroup,
+  expectedUsernamesForTopic,
   personalUsername,
   personalPassword,
   groupUsername,
@@ -76,6 +77,36 @@ async function setPassword(
   } catch (e) {
     r.errors.push(`改密碼 ${username}: ${errMsg(e)}`);
   }
+}
+
+async function setLock(
+  username: string,
+  locked: boolean,
+  map: Map<string, APIUser>,
+  r: SyncResult,
+): Promise<void> {
+  const user = map.get(username);
+  if (!user || user.isLocked === locked) return;
+  try {
+    await updateUser(user.uuid, { isLocked: locked });
+    r.updated++;
+  } catch (e) {
+    r.errors.push(`${locked ? "鎖定" : "解鎖"} ${username}: ${errMsg(e)}`);
+  }
+}
+
+/** Lock (close) or unlock (open) every existing account of a topic. */
+export async function syncSetTopicLock(
+  topic: Topic,
+  groups: Group[],
+  locked: boolean,
+): Promise<SyncResult> {
+  const r = emptyResult();
+  const map = await usernameMap();
+  for (const username of expectedUsernamesForTopic(topic, groups)) {
+    await setLock(username, locked, map, r);
+  }
+  return r;
 }
 
 /** Create every account a new topic implies across all groups. */

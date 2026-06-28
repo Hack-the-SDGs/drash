@@ -13,6 +13,8 @@ export interface Topic {
   /** Display name. */
   name: string;
   type: TopicType;
+  /** When false, the topic's generated accounts are locked. Defaults to open. */
+  open: boolean;
 }
 
 export interface GroupsConfig {

@@ -17,7 +17,9 @@ export async function readConfig(): Promise<GroupsConfig> {
   if (!raw) return EMPTY_CONFIG;
   try {
     const parsed = JSON.parse(raw) as Partial<GroupsConfig>;
-    return { groups: parsed.groups ?? [], topics: parsed.topics ?? [] };
+    // Normalize legacy topics that predate the `open` flag (treat as open).
+    const topics = (parsed.topics ?? []).map((t) => ({ ...t, open: t.open ?? true }));
+    return { groups: parsed.groups ?? [], topics };
   } catch {
     return EMPTY_CONFIG;
   }
