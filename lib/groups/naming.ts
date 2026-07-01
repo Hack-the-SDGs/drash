@@ -11,7 +11,7 @@ export async function sha256Hex(input: string): Promise<string> {
 }
 
 export function personalUsername(member: string, code: string): string {
-  return `${member}_${code}`;
+  return `U${member}_${code}`;
 }
 
 export function groupUsername(group: string, code: string): string {
