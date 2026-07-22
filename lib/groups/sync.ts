@@ -1,4 +1,5 @@
 import "server-only";
+import { unstable_rethrow } from "next/navigation";
 import { getUsers, createUser, updateUser, deleteUser } from "@/lib/drasl/users";
 import { DraslAPIError } from "@/lib/drasl/client";
 import { runPool } from "@/lib/pool";
@@ -32,6 +33,10 @@ function emptyResult(): SyncResult {
 }
 
 function errMsg(e: unknown): string {
+  // A caught redirect()/notFound() from draslFetch must not become a string —
+  // rethrow so Next handles it (401/403 → redirect to /login). Every catch here
+  // funnels through errMsg, so this one guard covers them all.
+  unstable_rethrow(e);
   return e instanceof DraslAPIError ? e.message : "unknown error";
 }
 
