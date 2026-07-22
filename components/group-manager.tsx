@@ -65,6 +65,57 @@ export function GroupManager({ groups, stats }: GroupManagerProps) {
   // Display groups ordered by number, smallest first.
   const sortedGroups = [...groups].sort((a, b) => Number(a.number) - Number(b.number));
 
+  /**
+   * Drive a chunked group action to completion: re-call it until `done`, showing
+   * live progress and accumulating the create/delete/update counts. Stops if a
+   * round makes no progress. `onDone` always runs (refresh + cleanup).
+   */
+  function runChunked(action: () => Promise<GroupActionResult>, onDone: () => void) {
+    startTransition(async () => {
+      const id = toast.loading(dict.groups.progress.replace("{done}", "0").replace("{total}", "…"));
+      let total = 0;
+      let created = 0;
+      let deleted = 0;
+      let updated = 0;
+      try {
+        for (let guard = 0; guard < 500; guard++) {
+          const res = await action();
+          const step = (res.created ?? 0) + (res.deleted ?? 0) + (res.updated ?? 0);
+          created += res.created ?? 0;
+          deleted += res.deleted ?? 0;
+          updated += res.updated ?? 0;
+          if (total === 0 && res.total) total = res.total;
+          if (res.done) {
+            toast.success(
+              created + deleted + updated > 0
+                ? dict.groups.syncSummary
+                    .replace("{created}", String(created))
+                    .replace("{deleted}", String(deleted))
+                    .replace("{updated}", String(updated))
+                : dict.groups.updated,
+              { id },
+            );
+            return;
+          }
+          if (step === 0) {
+            toast.error(res.error ?? dict.errors.unknown, { id });
+            return;
+          }
+          toast.loading(
+            dict.groups.progress
+              .replace("{done}", String(total - (res.remaining ?? 0)))
+              .replace("{total}", String(total)),
+            { id },
+          );
+        }
+        toast.error(dict.errors.unknown, { id }); // guard exhausted (unreachable in practice)
+      } finally {
+        onDone();
+        router.refresh();
+      }
+    });
+  }
+
   /** Run an action, surface the result, and refresh the server data on success. */
   function run(action: () => Promise<GroupActionResult>, onDone: () => void) {
     startTransition(async () => {
@@ -173,7 +224,7 @@ export function GroupManager({ groups, stats }: GroupManagerProps) {
         onOpenChange={setCreateOpen}
         pending={isPending}
         onSubmit={(number, members) =>
-          run(() => createGroupAction(number, members), () => setCreateOpen(false))
+          runChunked(() => createGroupAction(number, members), () => setCreateOpen(false))
         }
       />
 
@@ -196,7 +247,7 @@ export function GroupManager({ groups, stats }: GroupManagerProps) {
         onClose={() => setMembersTarget(null)}
         pending={isPending}
         onSubmit={(members) =>
-          run(
+          runChunked(
             () => updateMembersAction(membersTarget!.number, members),
             () => setMembersTarget(null),
           )
@@ -213,7 +264,7 @@ export function GroupManager({ groups, stats }: GroupManagerProps) {
         destructive
         pending={isPending}
         onConfirm={() =>
-          run(() => deleteGroupAction(deleteTarget!.number, true), () => setDeleteTarget(null))
+          runChunked(() => deleteGroupAction(deleteTarget!.number, true), () => setDeleteTarget(null))
         }
       />
     </div>

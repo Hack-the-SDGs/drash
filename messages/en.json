@@ -241,6 +241,7 @@
     "deleted": "Group deleted",
     "updated": "Group updated",
     "syncSummary": "{created} added, {deleted} deleted, {updated} re-passworded",
+    "progress": "Processing accounts… ({done}/{total})",
     "syncErrors": "{count} account operations failed"
   },
   "topics": {

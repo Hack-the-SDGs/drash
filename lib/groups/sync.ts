@@ -9,6 +9,7 @@ import {
   accountsForTopicInGroup,
   accountsForTopic,
   expectedUsernamesForTopic,
+  expandBots,
   personalUsername,
   personalPassword,
   groupUsername,
@@ -240,13 +241,12 @@ export async function syncCreateTopicChunk(
 }
 
 /** Create every account a new group implies across all existing topics. */
-export async function syncCreateGroup(
+export async function syncCreateGroupChunk(
   group: Group,
   topics: Topic[],
   managed: Set<string>,
-): Promise<SyncResult> {
-  const r = emptyResult();
-  const map = await usernameMap();
+  chunkSize: number,
+): Promise<ChunkResult> {
   // Flatten across topics, carrying each topic's locked state per account.
   const plan = (
     await Promise.all(
@@ -255,21 +255,17 @@ export async function syncCreateGroup(
       ),
     )
   ).flat();
-  await runPool(plan, SYNC_CONCURRENCY, (a) =>
+  const total = plan.length;
+  const todo = plan.filter((a) => !managed.has(a.username));
+  const before = todo.length;
+  const r = emptyResult();
+  if (before === 0) return { result: r, total, before, remaining: 0 };
+  const map = await usernameMap();
+  await runPool(todo.slice(0, chunkSize), SYNC_CONCURRENCY, (a) =>
     createIfAbsent(a.username, a.password, map, r, managed, a.locked),
   );
-  return r;
-}
-
-/** Delete the given usernames if they exist and are ours. */
-export async function syncDeleteUsernames(
-  usernames: string[],
-  managed: Set<string>,
-): Promise<SyncResult> {
-  const r = emptyResult();
-  const map = await usernameMap();
-  await runPool(usernames, SYNC_CONCURRENCY, (name) => deleteIfPresent(name, map, r, managed));
-  return r;
+  const remaining = plan.filter((a) => !managed.has(a.username)).length;
+  return { result: r, total, before, remaining };
 }
 
 /**
@@ -343,31 +339,51 @@ export async function syncRenumberGroup(
  * ponytail: cross-request races (two admins moving the same member at once) are
  * inherent to KV's lack of CAS — move group config to D1 if that matters.
  */
-export async function syncUpdateMembers(
+export async function syncUpdateMembersChunk(
   group: Group,
   addedMembers: string[],
   removedMembers: string[],
   personalTopics: Topic[],
   managed: Set<string>,
-): Promise<SyncResult> {
+  chunkSize: number,
+): Promise<ChunkResult> {
+  // expandBots so botCount>1 personal topics get every suffixed account.
+  const delNames = personalTopics.flatMap((t) =>
+    removedMembers.flatMap((m) => expandBots(personalUsername(m, t.code), t.botCount)),
+  );
+  const createAccounts = (
+    await Promise.all(
+      personalTopics.flatMap((t) =>
+        addedMembers.map(async (m) => {
+          const password = await personalPassword(group.number, m);
+          return expandBots(personalUsername(m, t.code), t.botCount).map((username) => ({
+            username,
+            password,
+            locked: !t.open,
+          }));
+        }),
+      ),
+    )
+  ).flat();
+  const remainingOps = () =>
+    delNames.filter((n) => managed.has(n)).length +
+    createAccounts.filter((a) => !managed.has(a.username)).length;
+
+  const before = remainingOps();
   const r = emptyResult();
+  if (before === 0) return { result: r, total: before, before, remaining: 0 };
+
   const map = await usernameMap();
-  const toDelete = personalTopics.flatMap((t) =>
-    removedMembers.map((m) => personalUsername(m, t.code)),
-  );
-  const toCreate = await Promise.all(
-    personalTopics.flatMap((t) =>
-      addedMembers.map(async (m) => ({
-        username: personalUsername(m, t.code),
-        password: await personalPassword(group.number, m),
-        locked: !t.open,
-      })),
-    ),
-  );
-  // Deletes must fully finish before any create, so a freed name is gone first.
-  await runPool(toDelete, SYNC_CONCURRENCY, (name) => deleteIfPresent(name, map, r, managed));
-  await runPool(toCreate, SYNC_CONCURRENCY, (a) =>
-    createIfAbsent(a.username, a.password, map, r, managed, a.locked),
-  );
-  return r;
+  // Deletes first (added/removed member sets are disjoint, so no name reuse),
+  // then creates within the leftover budget.
+  const delTodo = delNames.filter((n) => managed.has(n)).slice(0, chunkSize);
+  await runPool(delTodo, SYNC_CONCURRENCY, (n) => deleteIfPresent(n, map, r, managed));
+  const createBudget = chunkSize - delTodo.length;
+  if (createBudget > 0) {
+    const createTodo = createAccounts.filter((a) => !managed.has(a.username)).slice(0, createBudget);
+    await runPool(createTodo, SYNC_CONCURRENCY, (a) =>
+      createIfAbsent(a.username, a.password, map, r, managed, a.locked),
+    );
+  }
+  return { result: r, total: before, before, remaining: remainingOps() };
 }
