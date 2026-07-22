@@ -1,6 +1,8 @@
 import "server-only";
+import { unstable_rethrow } from "next/navigation";
 import { getUsers, createUser, updateUser, deleteUser } from "@/lib/drasl/users";
 import { DraslAPIError } from "@/lib/drasl/client";
+import { runPool } from "@/lib/pool";
 import type { APIUser } from "@/lib/types";
 import type { Group, Topic } from "./types";
 import {
@@ -12,6 +14,12 @@ import {
   groupUsername,
   groupPassword,
 } from "./naming";
+
+// How many Drasl account calls run at once. Sequential (=1) blew the request
+// timeout at ~100 accounts; this fans them out while staying gentle on Drasl.
+// 6 matches the Workers cap of 6 simultaneous outbound connections (higher just
+// queues). ponytail: 6 is the knob — lower it if Drasl 429s.
+const SYNC_CONCURRENCY = 6;
 
 export interface SyncResult {
   created: number;
@@ -25,6 +33,10 @@ function emptyResult(): SyncResult {
 }
 
 function errMsg(e: unknown): string {
+  // A caught redirect()/notFound() from draslFetch must not become a string —
+  // rethrow so Next handles it (401/403 → redirect to /login). Every catch here
+  // funnels through errMsg, so this one guard covers them all.
+  unstable_rethrow(e);
   return e instanceof DraslAPIError ? e.message : "unknown error";
 }
 
@@ -137,14 +149,12 @@ export async function syncUpdateTopicBotCount(
   const newAccounts = await accountsForTopic(groups, newTopic);
   const newNames = new Set(newAccounts.map((a) => a.username));
 
-  for (const name of oldNames) {
-    if (!newNames.has(name)) await deleteIfPresent(name, map, r, managed);
-  }
-  for (const account of newAccounts) {
-    if (!oldNames.has(account.username)) {
-      await createIfAbsent(account.username, account.password, map, r, managed, !newTopic.open);
-    }
-  }
+  const toDelete = [...oldNames].filter((n) => !newNames.has(n));
+  const toCreate = newAccounts.filter((a) => !oldNames.has(a.username));
+  await runPool(toDelete, SYNC_CONCURRENCY, (n) => deleteIfPresent(n, map, r, managed));
+  await runPool(toCreate, SYNC_CONCURRENCY, (a) =>
+    createIfAbsent(a.username, a.password, map, r, managed, !newTopic.open),
+  );
   return r;
 }
 
@@ -157,9 +167,9 @@ export async function syncSetTopicLock(
 ): Promise<SyncResult> {
   const r = emptyResult();
   const map = await usernameMap();
-  for (const username of expectedUsernamesForTopic(topic, groups)) {
-    await setLock(username, locked, map, r, managed);
-  }
+  await runPool(expectedUsernamesForTopic(topic, groups), SYNC_CONCURRENCY, (username) =>
+    setLock(username, locked, map, r, managed),
+  );
   return r;
 }
 
@@ -171,11 +181,10 @@ export async function syncCreateTopic(
 ): Promise<SyncResult> {
   const r = emptyResult();
   const map = await usernameMap();
-  for (const g of groups) {
-    for (const a of await accountsForTopicInGroup(g, topic)) {
-      await createIfAbsent(a.username, a.password, map, r, managed, !topic.open);
-    }
-  }
+  const accounts = await accountsForTopic(groups, topic);
+  await runPool(accounts, SYNC_CONCURRENCY, (a) =>
+    createIfAbsent(a.username, a.password, map, r, managed, !topic.open),
+  );
   return r;
 }
 
@@ -187,11 +196,17 @@ export async function syncCreateGroup(
 ): Promise<SyncResult> {
   const r = emptyResult();
   const map = await usernameMap();
-  for (const t of topics) {
-    for (const a of await accountsForTopicInGroup(group, t)) {
-      await createIfAbsent(a.username, a.password, map, r, managed, !t.open);
-    }
-  }
+  // Flatten across topics, carrying each topic's locked state per account.
+  const plan = (
+    await Promise.all(
+      topics.map(async (t) =>
+        (await accountsForTopicInGroup(group, t)).map((a) => ({ ...a, locked: !t.open })),
+      ),
+    )
+  ).flat();
+  await runPool(plan, SYNC_CONCURRENCY, (a) =>
+    createIfAbsent(a.username, a.password, map, r, managed, a.locked),
+  );
   return r;
 }
 
@@ -202,7 +217,7 @@ export async function syncDeleteUsernames(
 ): Promise<SyncResult> {
   const r = emptyResult();
   const map = await usernameMap();
-  for (const name of usernames) await deleteIfPresent(name, map, r, managed);
+  await runPool(usernames, SYNC_CONCURRENCY, (name) => deleteIfPresent(name, map, r, managed));
   return r;
 }
 
@@ -265,22 +280,22 @@ export async function syncUpdateMembers(
 ): Promise<SyncResult> {
   const r = emptyResult();
   const map = await usernameMap();
-  for (const t of personalTopics) {
-    for (const m of removedMembers) {
-      await deleteIfPresent(personalUsername(m, t.code), map, r, managed);
-    }
-  }
-  for (const t of personalTopics) {
-    for (const m of addedMembers) {
-      await createIfAbsent(
-        personalUsername(m, t.code),
-        await personalPassword(group.number, m),
-        map,
-        r,
-        managed,
-        !t.open,
-      );
-    }
-  }
+  const toDelete = personalTopics.flatMap((t) =>
+    removedMembers.map((m) => personalUsername(m, t.code)),
+  );
+  const toCreate = await Promise.all(
+    personalTopics.flatMap((t) =>
+      addedMembers.map(async (m) => ({
+        username: personalUsername(m, t.code),
+        password: await personalPassword(group.number, m),
+        locked: !t.open,
+      })),
+    ),
+  );
+  // Deletes must fully finish before any create, so a freed name is gone first.
+  await runPool(toDelete, SYNC_CONCURRENCY, (name) => deleteIfPresent(name, map, r, managed));
+  await runPool(toCreate, SYNC_CONCURRENCY, (a) =>
+    createIfAbsent(a.username, a.password, map, r, managed, a.locked),
+  );
   return r;
 }
