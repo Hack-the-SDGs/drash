@@ -173,19 +173,36 @@ export async function syncUpdateTopicBotCountChunk(
   return { result: r, total: before, before, remaining: remainingOps() };
 }
 
-/** Lock (close) or unlock (open) every existing account of a topic. */
-export async function syncSetTopicLock(
+/**
+ * Lock (close) or unlock (open) up to `chunkSize` of a topic's accounts that
+ * aren't already at the target state, per call (1 `getUsers` + ≤`chunkSize`
+ * `updateUser` subrequests), so toggling a big topic stays under the Workers
+ * 50-subrequest limit. Each call refetches state and only touches accounts still
+ * mismatched, so it's naturally idempotent; the caller loops until remaining 0.
+ */
+export async function syncSetTopicLockChunk(
   topic: Topic,
   groups: Group[],
   locked: boolean,
   managed: Set<string>,
-): Promise<SyncResult> {
-  const r = emptyResult();
+  chunkSize: number,
+): Promise<ChunkResult> {
+  const names = expectedUsernamesForTopic(topic, groups);
   const map = await usernameMap();
-  await runPool(expectedUsernamesForTopic(topic, groups), SYNC_CONCURRENCY, (username) =>
-    setLock(username, locked, map, r, managed),
-  );
-  return r;
+  // Ours, exists, and not already at the target lock state.
+  const todo = names.filter((n) => {
+    if (!managed.has(n)) return false;
+    const u = map.get(n);
+    return u !== undefined && u.isLocked !== locked;
+  });
+  const before = todo.length;
+  const r = emptyResult();
+  if (before === 0) return { result: r, total: names.length, before, remaining: 0 };
+  await runPool(todo.slice(0, chunkSize), SYNC_CONCURRENCY, (n) => setLock(n, locked, map, r, managed));
+  // `map` is a snapshot (not refreshed after updates); remaining = still-needed
+  // minus this call's successes. The next call recomputes from fresh state.
+  const remaining = before - r.updated;
+  return { result: r, total: names.length, before, remaining };
 }
 
 export interface ChunkResult {

@@ -6,7 +6,7 @@ import { requireAdmin } from "@/lib/groups/guard";
 import {
   syncCreateTopicChunk,
   syncDeleteUsernamesChunk,
-  syncSetTopicLock,
+  syncSetTopicLockChunk,
   syncUpdateTopicBotCountChunk,
   type SyncResult,
 } from "@/lib/groups/sync";
@@ -27,6 +27,7 @@ export interface TopicActionResult {
   done?: boolean; // the whole operation is complete
   created?: number; // accounts created in THIS call
   deleted?: number; // accounts deleted in THIS call
+  updated?: number; // accounts locked/unlocked in THIS call
   total?: number; // operation size (denominator for progress)
   remaining?: number; // work still left after this call
 }
@@ -115,21 +116,32 @@ export async function setTopicOpenAction(
   const topic = config.topics.find((t) => t.code === code);
   if (!topic) return fail(`找不到題目 ${code}`);
 
-  // Lock/unlock accounts first; only persist the open flag if it fully
-  // succeeded, so the UI never shows "closed" while accounts stay unlocked.
+  // Lock/unlock accounts in chunks; persist the open flag only once every
+  // account reached the target state, so the UI never shows "closed" while
+  // accounts stay unlocked. The client loops until done.
   const managed = loadManaged(config);
-  const sync = await syncSetTopicLock(topic, config.groups, !open, managed);
+  const { result: sync, total, remaining } = await syncSetTopicLockChunk(
+    topic,
+    config.groups,
+    !open,
+    managed,
+    CHUNK,
+  );
   updateTag("users");
-  if (sync.errors.length > 0) {
-    await writeConfig({ ...config, managed: [...managed] });
-    return { success: false, error: syncFailure(sync), sync };
-  }
-  await writeConfig({
-    ...config,
-    topics: config.topics.map((t) => (t.code === code ? { ...t, open } : t)),
-    managed: [...managed],
-  });
-  return { success: true, sync };
+  const done = remaining === 0 && sync.errors.length === 0;
+  const topics = done
+    ? config.topics.map((t) => (t.code === code ? { ...t, open } : t))
+    : config.topics;
+  await writeConfig({ ...config, topics, managed: [...managed] });
+  return {
+    success: sync.errors.length === 0,
+    error: sync.errors.length > 0 ? syncFailure(sync) : undefined,
+    sync,
+    done,
+    updated: sync.updated,
+    total,
+    remaining,
+  };
 }
 
 export async function updateTopicAction(
