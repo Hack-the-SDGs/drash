@@ -86,6 +86,55 @@ export function TopicManager({ topics, stats }: TopicManagerProps) {
     });
   }
 
+  /**
+   * Create a topic by looping the chunked action until every account exists.
+   * Each call creates up to ~40 accounts (kept under the Workers subrequest
+   * limit); we show live progress and stop if a round makes no progress.
+   */
+  function createChunked(
+    name: string,
+    code: string,
+    type: TopicType,
+    botCount: number,
+    onDone: () => void,
+  ) {
+    startTransition(async () => {
+      const id = toast.loading(
+        dict.topics.creating.replace("{created}", "0").replace("{total}", "…"),
+      );
+      let created = 0;
+      let total = 0;
+      // Guard against an unbounded loop (500 chunks × 40 ≫ any real topic).
+      for (let guard = 0; guard < 500; guard++) {
+        const res = await createTopicAction(name, code, type, botCount);
+        // Validation/conflict before anything was created → surface and stop.
+        if (!res.success && created === 0 && (res.created ?? 0) === 0 && !res.done) {
+          toast.error(res.error ?? dict.errors.unknown, { id });
+          return;
+        }
+        created += res.created ?? 0;
+        total = res.total ?? total;
+        if (res.done) {
+          toast.success(dict.topics.created.replace("{created}", String(created)), { id });
+          break;
+        }
+        if ((res.created ?? 0) === 0) {
+          // No progress this round → permanently stuck (collision / Drasl error).
+          toast.error(res.error ?? dict.errors.unknown, { id });
+          break;
+        }
+        toast.loading(
+          dict.topics.creating
+            .replace("{created}", String(created))
+            .replace("{total}", String(total)),
+          { id },
+        );
+      }
+      onDone();
+      router.refresh();
+    });
+  }
+
   function run(action: () => Promise<TopicActionResult>, successMsg: string, onDone: () => void) {
     startTransition(async () => {
       const result = await action();
@@ -174,9 +223,7 @@ export function TopicManager({ topics, stats }: TopicManagerProps) {
         onOpenChange={setCreateOpen}
         pending={isPending}
         onSubmit={(name, code, type, botCount) =>
-          run(() => createTopicAction(name, code, type, botCount), dict.topics.created, () =>
-            setCreateOpen(false),
-          )
+          createChunked(name, code, type, botCount, () => setCreateOpen(false))
         }
       />
 

@@ -173,19 +173,38 @@ export async function syncSetTopicLock(
   return r;
 }
 
-/** Create every account a new topic implies across all groups. */
-export async function syncCreateTopic(
+export interface ChunkResult {
+  result: SyncResult;
+  total: number; // accounts the topic needs in total
+  before: number; // accounts still missing before this chunk ran
+  remaining: number; // accounts still missing after this chunk
+}
+
+/**
+ * Create up to `chunkSize` of a topic's not-yet-owned accounts. Each call makes
+ * 1 `getUsers` + at most `chunkSize` `createUser` subrequests, so a large topic
+ * (e.g. 69 personal accounts) can be built across several requests without
+ * tripping the Cloudflare Workers 50-subrequest-per-request limit. The caller
+ * loops until `remaining === 0`. Passwords are hashed locally (no subrequests).
+ */
+export async function syncCreateTopicChunk(
   groups: Group[],
   topic: Topic,
   managed: Set<string>,
-): Promise<SyncResult> {
-  const r = emptyResult();
-  const map = await usernameMap();
+  chunkSize: number,
+): Promise<ChunkResult> {
   const accounts = await accountsForTopic(groups, topic);
-  await runPool(accounts, SYNC_CONCURRENCY, (a) =>
+  const total = accounts.length;
+  const todo = accounts.filter((a) => !managed.has(a.username));
+  const before = todo.length;
+  const r = emptyResult();
+  if (before === 0) return { result: r, total, before, remaining: 0 };
+  const map = await usernameMap();
+  await runPool(todo.slice(0, chunkSize), SYNC_CONCURRENCY, (a) =>
     createIfAbsent(a.username, a.password, map, r, managed, !topic.open),
   );
-  return r;
+  const remaining = accounts.filter((a) => !managed.has(a.username)).length;
+  return { result: r, total, before, remaining };
 }
 
 /** Create every account a new group implies across all existing topics. */

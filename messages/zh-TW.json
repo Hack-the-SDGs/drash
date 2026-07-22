@@ -262,6 +262,7 @@
     "deleteTopicConfirm": "確定移除題目「{name}」？此題目產生的使用者與玩家也會一併刪除。",
     "noTopics": "尚無題目，點右上角新增",
     "created": "題目已建立（新增 {created} 個帳號）",
+    "creating": "建立帳號中…（{created}/{total}）",
     "deleted": "題目已移除",
     "renamed": "題目名稱已更新",
     "accountCount": "帳號數量",

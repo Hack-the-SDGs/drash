@@ -4,7 +4,7 @@ import { updateTag } from "next/cache";
 import { readConfig, writeConfig } from "@/lib/groups/store";
 import { requireAdmin } from "@/lib/groups/guard";
 import {
-  syncCreateTopic,
+  syncCreateTopicChunk,
   syncDeleteUsernames,
   syncSetTopicLock,
   syncUpdateTopicBotCount,
@@ -15,10 +15,19 @@ import { MAX_BOT_COUNT, type Topic, type TopicType } from "@/lib/groups/types";
 
 const CODE = /^[a-z0-9_]+$/;
 
+// Accounts to create per createTopicAction call. 1 getUsers + 40 createUser =
+// 41 subrequests, safely under the Cloudflare Workers free-plan cap of 50 per
+// request. A big topic is built over several calls (the client loops).
+const CREATE_CHUNK = 40;
+
 export interface TopicActionResult {
   success: boolean;
   error?: string;
   sync?: SyncResult;
+  done?: boolean; // all of the topic's accounts now exist
+  created?: number; // accounts created in THIS call
+  total?: number; // accounts the topic needs in total
+  remaining?: number; // accounts still missing after this call
 }
 
 function fail(error: string): TopicActionResult {
@@ -54,25 +63,44 @@ export async function createTopicAction(
   if (botErr) return fail(botErr);
 
   const config = await readConfig();
-  if (config.topics.some((t) => t.code === code)) return fail(`題目代號 ${code} 已存在`);
-
-  const topic: Topic = { name, code, type, open: true, botCount };
-  // Create accounts first. If any failed, don't persist the topic — only the
-  // registry — so it isn't saved with a partial account set. A retry re-runs
-  // creation (existing accounts skipped as ours) and converges.
-  const managed = loadManaged(config);
-  const sync = await syncCreateTopic(config.groups, topic, managed);
-  updateTag("users");
-  if (sync.errors.length > 0) {
-    await writeConfig({ ...config, managed: [...managed] });
-    return { success: false, error: syncFailure(sync), sync };
+  const existing = config.topics.find((t) => t.code === code);
+  // Same code but a different shape is a real conflict. Same shape that's only
+  // partially built means this call resumes the build (the client loops until
+  // done), so a big topic can be created across several sub-request-bounded calls.
+  if (existing && (existing.type !== type || existing.botCount !== botCount)) {
+    return fail(`題目代號 ${code} 已存在`);
   }
-  await writeConfig({
-    ...config,
-    topics: [...config.topics, topic],
-    managed: [...managed],
-  });
-  return { success: true, sync };
+  const topic: Topic = existing ?? { name, code, type, open: true, botCount };
+  const managed = loadManaged(config);
+
+  const { result: sync, total, before, remaining } = await syncCreateTopicChunk(
+    config.groups,
+    topic,
+    managed,
+    CREATE_CHUNK,
+  );
+  // Already fully built and it existed → a genuine duplicate.
+  if (existing && before === 0) return fail(`題目代號 ${code} 已存在`);
+  updateTag("users");
+
+  const done = remaining === 0 && sync.errors.length === 0;
+  // Persist the topic once we've made progress (or it's done) so a partial build
+  // stays visible and resumable; persist `managed` every chunk so created
+  // accounts are never lost. A brand-new topic whose first chunk created nothing
+  // (all collisions) isn't persisted — no ghost 0-account topic.
+  const persistTopic = !existing && (sync.created > 0 || done);
+  const topics = persistTopic ? [...config.topics, topic] : config.topics;
+  await writeConfig({ ...config, topics, managed: [...managed] });
+
+  return {
+    success: sync.errors.length === 0,
+    error: sync.errors.length > 0 ? syncFailure(sync) : undefined,
+    sync,
+    done,
+    created: sync.created,
+    total,
+    remaining,
+  };
 }
 
 export async function setTopicOpenAction(

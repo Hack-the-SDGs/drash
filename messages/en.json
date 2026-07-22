@@ -262,6 +262,7 @@
     "deleteTopicConfirm": "Remove topic \"{name}\"? Its generated users and players will also be deleted.",
     "noTopics": "No topics yet — create one from the top right",
     "created": "Topic created ({created} accounts added)",
+    "creating": "Creating accounts… ({created}/{total})",
     "deleted": "Topic removed",
     "renamed": "Topic name updated",
     "accountCount": "Accounts",
