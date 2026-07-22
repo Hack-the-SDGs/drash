@@ -131,31 +131,46 @@ async function setLock(
 }
 
 /**
- * Apply a topic's bot-count change: delete accounts no longer expected and
- * create the newly added ones (matching the topic's open/locked state).
- * Crossing the 1↔N boundary renames the bare account, which Drasl can't do in
- * place, so the old user is recreated — acceptable here since these are derived
- * bot accounts (players are recreated same-name, no OIDC, tokens are ephemeral).
+ * Reconcile a topic's accounts toward its new bot count, at most `chunkSize`
+ * operations per call (1 `getUsers` + ≤`chunkSize` delete/create subrequests),
+ * so a big change stays under the Workers 50-subrequest limit. Deletes the
+ * accounts no longer expected and creates the newly added ones; crossing the
+ * 1↔N boundary renames the bare account (Drasl can't rename in place, so the old
+ * user is recreated — fine for derived bot accounts). The caller passes the old
+ * topic (so the removed name set stays derivable) and loops until remaining 0.
  */
-export async function syncUpdateTopicBotCount(
+export async function syncUpdateTopicBotCountChunk(
   oldTopic: Topic,
   newTopic: Topic,
   groups: Group[],
   managed: Set<string>,
-): Promise<SyncResult> {
-  const r = emptyResult();
-  const map = await usernameMap();
+  chunkSize: number,
+): Promise<ChunkResult> {
   const oldNames = new Set(expectedUsernamesForTopic(oldTopic, groups));
   const newAccounts = await accountsForTopic(groups, newTopic);
   const newNames = new Set(newAccounts.map((a) => a.username));
+  // Delete owned old names that are no longer wanted; create wanted names we
+  // don't own yet. The two sets are disjoint (a name can't be both).
+  const remainingOps = () =>
+    [...oldNames].filter((n) => !newNames.has(n) && managed.has(n)).length +
+    newAccounts.filter((a) => !managed.has(a.username)).length;
 
-  const toDelete = [...oldNames].filter((n) => !newNames.has(n));
-  const toCreate = newAccounts.filter((a) => !oldNames.has(a.username));
-  await runPool(toDelete, SYNC_CONCURRENCY, (n) => deleteIfPresent(n, map, r, managed));
-  await runPool(toCreate, SYNC_CONCURRENCY, (a) =>
-    createIfAbsent(a.username, a.password, map, r, managed, !newTopic.open),
-  );
-  return r;
+  const before = remainingOps();
+  const r = emptyResult();
+  if (before === 0) return { result: r, total: before, before, remaining: 0 };
+
+  const map = await usernameMap();
+  const toDelete = [...oldNames].filter((n) => !newNames.has(n) && managed.has(n));
+  const delNow = toDelete.slice(0, chunkSize);
+  await runPool(delNow, SYNC_CONCURRENCY, (n) => deleteIfPresent(n, map, r, managed));
+  const createBudget = chunkSize - delNow.length;
+  if (createBudget > 0) {
+    const toCreate = newAccounts.filter((a) => !managed.has(a.username)).slice(0, createBudget);
+    await runPool(toCreate, SYNC_CONCURRENCY, (a) =>
+      createIfAbsent(a.username, a.password, map, r, managed, !newTopic.open),
+    );
+  }
+  return { result: r, total: before, before, remaining: remainingOps() };
 }
 
 /** Lock (close) or unlock (open) every existing account of a topic. */
@@ -238,6 +253,27 @@ export async function syncDeleteUsernames(
   const map = await usernameMap();
   await runPool(usernames, SYNC_CONCURRENCY, (name) => deleteIfPresent(name, map, r, managed));
   return r;
+}
+
+/**
+ * Delete up to `chunkSize` of the given usernames that are ours, per call (1
+ * `getUsers` + ≤`chunkSize` `deleteUser` subrequests), so removing a big topic
+ * stays under the Workers 50-subrequest limit. The caller loops until remaining
+ * 0. `total` is the full name count; `remaining` counts names still owned.
+ */
+export async function syncDeleteUsernamesChunk(
+  usernames: string[],
+  managed: Set<string>,
+  chunkSize: number,
+): Promise<ChunkResult> {
+  const todo = usernames.filter((n) => managed.has(n));
+  const before = todo.length;
+  const r = emptyResult();
+  if (before === 0) return { result: r, total: usernames.length, before, remaining: 0 };
+  const map = await usernameMap();
+  await runPool(todo.slice(0, chunkSize), SYNC_CONCURRENCY, (n) => deleteIfPresent(n, map, r, managed));
+  const remaining = usernames.filter((n) => managed.has(n)).length;
+  return { result: r, total: usernames.length, before, remaining };
 }
 
 /**

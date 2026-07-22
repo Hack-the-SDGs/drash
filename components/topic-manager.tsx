@@ -87,64 +87,41 @@ export function TopicManager({ topics, stats }: TopicManagerProps) {
   }
 
   /**
-   * Create a topic by looping the chunked action until every account exists.
-   * Each call creates up to ~40 accounts (kept under the Workers subrequest
-   * limit); we show live progress and stop if a round makes no progress.
+   * Drive a chunked topic action to completion: re-call it until `done`, showing
+   * live progress, and stop early if a round makes no progress (stuck) or the
+   * first call fails validation. Each call stays under the Workers subrequest cap.
    */
-  function createChunked(
-    name: string,
-    code: string,
-    type: TopicType,
-    botCount: number,
+  function runChunked(
+    action: () => Promise<TopicActionResult>,
+    progress: (done: number, total: number) => string,
+    success: (processed: number) => string,
     onDone: () => void,
   ) {
     startTransition(async () => {
-      const id = toast.loading(
-        dict.topics.creating.replace("{created}", "0").replace("{total}", "…"),
-      );
-      let created = 0;
+      const id = toast.loading(progress(0, 0));
       let total = 0;
+      let processed = 0;
       // Guard against an unbounded loop (500 chunks × 40 ≫ any real topic).
       for (let guard = 0; guard < 500; guard++) {
-        const res = await createTopicAction(name, code, type, botCount);
-        // Validation/conflict before anything was created → surface and stop.
-        if (!res.success && created === 0 && (res.created ?? 0) === 0 && !res.done) {
+        const res = await action();
+        const step = (res.created ?? 0) + (res.deleted ?? 0);
+        // Validation/conflict before any progress → surface and stop.
+        if (!res.success && processed === 0 && step === 0 && !res.done) {
           toast.error(res.error ?? dict.errors.unknown, { id });
           return;
         }
-        created += res.created ?? 0;
-        total = res.total ?? total;
+        processed += step;
+        if (total === 0 && res.total) total = res.total;
         if (res.done) {
-          toast.success(dict.topics.created.replace("{created}", String(created)), { id });
+          toast.success(success(processed), { id });
           break;
         }
-        if ((res.created ?? 0) === 0) {
+        if (step === 0) {
           // No progress this round → permanently stuck (collision / Drasl error).
           toast.error(res.error ?? dict.errors.unknown, { id });
           break;
         }
-        toast.loading(
-          dict.topics.creating
-            .replace("{created}", String(created))
-            .replace("{total}", String(total)),
-          { id },
-        );
-      }
-      onDone();
-      router.refresh();
-    });
-  }
-
-  function run(action: () => Promise<TopicActionResult>, successMsg: string, onDone: () => void) {
-    startTransition(async () => {
-      const result = await action();
-      if (!result.success) {
-        toast.error(result.error ?? dict.errors.unknown);
-        return;
-      }
-      toast.success(successMsg.replace("{created}", String(result.sync?.created ?? 0)));
-      if (result.sync && result.sync.errors.length > 0) {
-        toast.error(dict.groups.syncErrors.replace("{count}", String(result.sync.errors.length)));
+        toast.loading(progress(total - (res.remaining ?? 0), total), { id });
       }
       onDone();
       router.refresh();
@@ -223,7 +200,13 @@ export function TopicManager({ topics, stats }: TopicManagerProps) {
         onOpenChange={setCreateOpen}
         pending={isPending}
         onSubmit={(name, code, type, botCount) =>
-          createChunked(name, code, type, botCount, () => setCreateOpen(false))
+          runChunked(
+            () => createTopicAction(name, code, type, botCount),
+            (n, t) =>
+              dict.topics.creating.replace("{created}", String(n)).replace("{total}", t ? String(t) : "…"),
+            (p) => dict.topics.created.replace("{created}", String(p)),
+            () => setCreateOpen(false),
+          )
         }
       />
 
@@ -233,9 +216,11 @@ export function TopicManager({ topics, stats }: TopicManagerProps) {
         onClose={() => setRenameTarget(null)}
         pending={isPending}
         onSubmit={(name, botCount) =>
-          run(
+          runChunked(
             () => updateTopicAction(renameTarget!.code, name, botCount),
-            dict.topics.renamed,
+            (n, t) =>
+              dict.topics.updating.replace("{done}", String(n)).replace("{total}", t ? String(t) : "…"),
+            () => dict.topics.updated,
             () => setRenameTarget(null),
           )
         }
@@ -251,9 +236,11 @@ export function TopicManager({ topics, stats }: TopicManagerProps) {
         destructive
         pending={isPending}
         onConfirm={() =>
-          run(
+          runChunked(
             () => deleteTopicAction(deleteTarget!.code, true),
-            dict.topics.deleted,
+            (n, t) =>
+              dict.topics.deleting.replace("{deleted}", String(n)).replace("{total}", t ? String(t) : "…"),
+            () => dict.topics.deleted,
             () => setDeleteTarget(null),
           )
         }
