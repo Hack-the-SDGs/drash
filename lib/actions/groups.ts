@@ -6,7 +6,7 @@ import { requireAdmin } from "@/lib/groups/guard";
 import {
   syncCreateGroupChunk,
   syncDeleteUsernamesChunk,
-  syncRenumberGroup,
+  syncRenumberGroupChunk,
   syncUpdateMembersChunk,
   type SyncResult,
 } from "@/lib/groups/sync";
@@ -28,7 +28,8 @@ export interface GroupActionResult {
   deleted?: number; // accounts deleted in THIS call
   updated?: number; // accounts updated in THIS call
   total?: number; // operation size (denominator for progress)
-  remaining?: number; // work still left after this call
+  remaining?: number; // work still left after this call (state-based ops)
+  offset?: number; // ops processed so far (renumber's offset-based loop)
 }
 
 function fail(error: string): GroupActionResult {
@@ -143,13 +144,14 @@ export async function deleteGroupAction(
 export async function renumberGroupAction(
   oldNumber: string,
   rawNewNumber: string,
+  offset: number,
 ): Promise<GroupActionResult> {
   const denied = await requireAdmin();
   if (denied) return fail(denied);
 
   const newNumber = rawNewNumber.trim();
   if (!NUM.test(newNumber)) return fail("組別編號必須為數字");
-  if (newNumber === oldNumber) return { success: true };
+  if (newNumber === oldNumber) return { success: true, done: true, total: 0, offset: 0 };
 
   const config = await readConfig();
   const group = config.groups.find((g) => g.number === oldNumber);
@@ -158,20 +160,36 @@ export async function renumberGroupAction(
 
   const updated: Group = { ...group, number: newNumber };
   const managed = loadManaged(config);
-  const sync = await syncRenumberGroup(oldNumber, updated, config.topics, managed);
+  const {
+    result: sync,
+    total,
+    offset: newOffset,
+    done,
+    renamesRemaining,
+  } = await syncRenumberGroupChunk(oldNumber, updated, config.topics, managed, offset, CHUNK);
   updateTag("users");
-  if (sync.errors.length > 0) {
-    // Keep the old number so a retry recomputes from the same baseline and
-    // finishes the partial rename, rather than stranding old-number accounts.
-    await writeConfig({ ...config, managed: [...managed] });
-    return { success: false, error: syncFailure(sync), sync };
-  }
-  await writeConfig({
-    ...config,
-    groups: config.groups.map((g) => (g.number === oldNumber ? updated : g)),
-    managed: [...managed],
-  });
-  return { success: true, sync };
+
+  // Commit the new number once the whole op list is processed AND every group
+  // account has actually been renamed. The renames are destructive, so once they
+  // land, config MUST match them even if a personal-password PATCH failed (a
+  // stale password is recoverable; a mismatched group number would strand
+  // accounts). If a rename itself failed, keep the old number so a retry resumes.
+  const persistNumber = done && renamesRemaining === 0;
+  const groups = persistNumber
+    ? config.groups.map((g) => (g.number === oldNumber ? updated : g))
+    : config.groups;
+  await writeConfig({ ...config, groups, managed: [...managed] });
+  return {
+    success: sync.errors.length === 0,
+    error: sync.errors.length > 0 ? syncFailure(sync) : undefined,
+    sync,
+    done,
+    offset: newOffset,
+    total,
+    created: sync.created,
+    deleted: sync.deleted,
+    updated: sync.updated,
+  };
 }
 
 export async function updateMembersAction(

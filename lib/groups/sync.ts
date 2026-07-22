@@ -290,44 +290,77 @@ export async function syncDeleteUsernamesChunk(
 }
 
 /**
- * Cascade a group renumber (oldNumber -> group.number).
- * Personal-topic usernames don't contain the group number, so only their
- * password changes (in-place PATCH). Group-topic usernames do change, so the
- * old user is deleted and a new one created (username is immutable in Drasl).
- * The replacement inherits the topic's open/locked state.
+ * Cascade a group renumber (oldNumber -> group.number), `chunkSize` ops per call.
+ * Group-topic usernames change → delete old + create new (detectable via the
+ * registry). Personal-topic usernames don't change, only the password does (an
+ * in-place PATCH that isn't detectable), so this is offset-based: the caller
+ * passes how many ops are done and loops until `done`. `renamesRemaining` lets
+ * the caller gate persistence on the (detectable, destructive) group renames.
  */
-export async function syncRenumberGroup(
+export interface RenumberChunkResult {
+  result: SyncResult;
+  total: number;
+  offset: number; // ops processed so far (new offset)
+  done: boolean;
+  renamesRemaining: number; // group-topic renames not yet applied
+}
+
+export async function syncRenumberGroupChunk(
   oldNumber: string,
   group: Group,
   topics: Topic[],
   managed: Set<string>,
-): Promise<SyncResult> {
-  const r = emptyResult();
-  const map = await usernameMap();
-  for (const t of topics) {
-    if (t.type === "personal") {
-      for (const m of group.members) {
-        await setPassword(
-          personalUsername(m, t.code),
-          await personalPassword(group.number, m),
-          map,
-          r,
-          managed,
-        );
-      }
-    } else {
-      await deleteIfPresent(groupUsername(oldNumber, t.code), map, r, managed);
-      await createIfAbsent(
-        groupUsername(group.number, t.code),
-        await groupPassword(group.number),
-        map,
-        r,
-        managed,
-        !t.open,
-      );
+  offset: number,
+  chunkSize: number,
+): Promise<RenumberChunkResult> {
+  type Op =
+    | { kind: "delete"; username: string }
+    | { kind: "create"; username: string; password: string; locked: boolean }
+    | { kind: "password"; username: string; password: string };
+  const ops: Op[] = [];
+  const groupTopics = topics.filter((t) => t.type === "group");
+  // Stable order: delete old group accounts, create new ones, then re-password
+  // personal accounts. Delete/create names are disjoint, so a concurrent chunk
+  // never races the same name.
+  for (const t of groupTopics) {
+    for (const name of expandBots(groupUsername(oldNumber, t.code), t.botCount)) {
+      ops.push({ kind: "delete", username: name });
     }
   }
-  return r;
+  for (const t of groupTopics) {
+    const password = await groupPassword(group.number);
+    for (const name of expandBots(groupUsername(group.number, t.code), t.botCount)) {
+      ops.push({ kind: "create", username: name, password, locked: !t.open });
+    }
+  }
+  for (const t of topics) {
+    if (t.type !== "personal") continue;
+    for (const m of group.members) {
+      const password = await personalPassword(group.number, m);
+      for (const username of expandBots(personalUsername(m, t.code), t.botCount)) {
+        ops.push({ kind: "password", username, password });
+      }
+    }
+  }
+
+  const total = ops.length;
+  const r = emptyResult();
+  const slice = ops.slice(offset, offset + chunkSize);
+  if (slice.length > 0) {
+    const map = await usernameMap();
+    await runPool(slice, SYNC_CONCURRENCY, (op) => {
+      if (op.kind === "delete") return deleteIfPresent(op.username, map, r, managed);
+      if (op.kind === "create")
+        return createIfAbsent(op.username, op.password, map, r, managed, op.locked);
+      return setPassword(op.username, op.password, map, r, managed);
+    });
+  }
+  const newOffset = offset + slice.length;
+  const oldNames = groupTopics.flatMap((t) => expandBots(groupUsername(oldNumber, t.code), t.botCount));
+  const newNames = groupTopics.flatMap((t) => expandBots(groupUsername(group.number, t.code), t.botCount));
+  const renamesRemaining =
+    oldNames.filter((n) => managed.has(n)).length + newNames.filter((n) => !managed.has(n)).length;
+  return { result: r, total, offset: newOffset, done: newOffset >= total, renamesRemaining };
 }
 
 /**
