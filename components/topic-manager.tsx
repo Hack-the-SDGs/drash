@@ -65,40 +65,66 @@ export function TopicManager({ topics, stats }: TopicManagerProps) {
 
   const countByCode = new Map(stats.map((s) => [s.code, s.accountCount]));
 
-  /** Open/close a topic: locks or unlocks its accounts. Disabled until done. */
+  /** Open/close a topic: locks/unlocks its accounts in chunks. Disabled until done. */
   function handleToggleOpen(topic: Topic, open: boolean) {
     setTogglingCode(topic.code);
-    startTransition(async () => {
-      const result = await setTopicOpenAction(topic.code, open);
-      if (!result.success) {
-        toast.error(result.error ?? dict.errors.unknown);
-      } else {
-        const count = result.sync?.updated ?? 0;
-        toast.success(
-          (open ? dict.topics.opened : dict.topics.closed).replace("{count}", String(count)),
-        );
-        if (result.sync && result.sync.errors.length > 0) {
-          toast.error(dict.groups.syncErrors.replace("{count}", String(result.sync.errors.length)));
-        }
-      }
-      setTogglingCode(null);
-      router.refresh();
-    });
+    runChunked(
+      () => setTopicOpenAction(topic.code, open),
+      (n, t) =>
+        dict.topics.updating.replace("{done}", String(n)).replace("{total}", t ? String(t) : "…"),
+      (p) => (open ? dict.topics.opened : dict.topics.closed).replace("{count}", String(p)),
+      () => setTogglingCode(null),
+    );
   }
 
-  function run(action: () => Promise<TopicActionResult>, successMsg: string, onDone: () => void) {
+  /**
+   * Drive a chunked topic action to completion: re-call it until `done`, showing
+   * live progress, and stop if a round makes no progress (validation error or
+   * stuck). Each call stays under the Workers subrequest cap. `onDone` always
+   * runs (refresh + any cleanup), even on failure.
+   */
+  function runChunked(
+    action: () => Promise<TopicActionResult>,
+    progress: (done: number, total: number) => string,
+    success: (processed: number) => string,
+    onDone: () => void,
+  ) {
     startTransition(async () => {
-      const result = await action();
-      if (!result.success) {
-        toast.error(result.error ?? dict.errors.unknown);
-        return;
+      const id = toast.loading(progress(0, 0));
+      let total = 0;
+      let processed = 0;
+      let prevRemaining = Infinity;
+      try {
+        // Guard against an unbounded loop (500 chunks × 40 ≫ any real topic).
+        for (let guard = 0; guard < 500; guard++) {
+          const res = await action();
+          processed += (res.created ?? 0) + (res.deleted ?? 0) + (res.updated ?? 0);
+          if (res.done) {
+            toast.success(success(processed), { id });
+            return;
+          }
+          // No chunk ran (validation/conflict) → surface and stop.
+          if (res.total === undefined) {
+            toast.error(res.error ?? dict.errors.unknown, { id });
+            return;
+          }
+          if (total === 0) total = res.total;
+          // Stuck = the server's remaining didn't shrink. Using remaining (not the
+          // op count) counts registry-only prunes as progress, so a chunk that
+          // deletes phantom names doesn't read as stuck.
+          const remaining = res.remaining ?? 0;
+          if (remaining >= prevRemaining) {
+            toast.error(res.error ?? dict.errors.unknown, { id });
+            return;
+          }
+          prevRemaining = remaining;
+          toast.loading(progress(total - remaining, total), { id });
+        }
+        toast.error(dict.errors.unknown, { id }); // guard exhausted (unreachable in practice)
+      } finally {
+        onDone();
+        router.refresh();
       }
-      toast.success(successMsg.replace("{created}", String(result.sync?.created ?? 0)));
-      if (result.sync && result.sync.errors.length > 0) {
-        toast.error(dict.groups.syncErrors.replace("{count}", String(result.sync.errors.length)));
-      }
-      onDone();
-      router.refresh();
     });
   }
 
@@ -174,8 +200,12 @@ export function TopicManager({ topics, stats }: TopicManagerProps) {
         onOpenChange={setCreateOpen}
         pending={isPending}
         onSubmit={(name, code, type, botCount) =>
-          run(() => createTopicAction(name, code, type, botCount), dict.topics.created, () =>
-            setCreateOpen(false),
+          runChunked(
+            () => createTopicAction(name, code, type, botCount),
+            (n, t) =>
+              dict.topics.creating.replace("{created}", String(n)).replace("{total}", t ? String(t) : "…"),
+            (p) => dict.topics.created.replace("{created}", String(p)),
+            () => setCreateOpen(false),
           )
         }
       />
@@ -186,9 +216,11 @@ export function TopicManager({ topics, stats }: TopicManagerProps) {
         onClose={() => setRenameTarget(null)}
         pending={isPending}
         onSubmit={(name, botCount) =>
-          run(
+          runChunked(
             () => updateTopicAction(renameTarget!.code, name, botCount),
-            dict.topics.renamed,
+            (n, t) =>
+              dict.topics.updating.replace("{done}", String(n)).replace("{total}", t ? String(t) : "…"),
+            () => dict.topics.updated,
             () => setRenameTarget(null),
           )
         }
@@ -204,9 +236,11 @@ export function TopicManager({ topics, stats }: TopicManagerProps) {
         destructive
         pending={isPending}
         onConfirm={() =>
-          run(
+          runChunked(
             () => deleteTopicAction(deleteTarget!.code, true),
-            dict.topics.deleted,
+            (n, t) =>
+              dict.topics.deleting.replace("{deleted}", String(n)).replace("{total}", t ? String(t) : "…"),
+            () => dict.topics.deleted,
             () => setDeleteTarget(null),
           )
         }

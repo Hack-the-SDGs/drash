@@ -241,6 +241,7 @@
     "deleted": "Group deleted",
     "updated": "Group updated",
     "syncSummary": "{created} added, {deleted} deleted, {updated} re-passworded",
+    "progress": "Processing accounts… ({done}/{total})",
     "syncErrors": "{count} account operations failed"
   },
   "topics": {
@@ -262,6 +263,10 @@
     "deleteTopicConfirm": "Remove topic \"{name}\"? Its generated users and players will also be deleted.",
     "noTopics": "No topics yet — create one from the top right",
     "created": "Topic created ({created} accounts added)",
+    "creating": "Creating accounts… ({created}/{total})",
+    "deleting": "Removing accounts… ({deleted}/{total})",
+    "updating": "Updating accounts… ({done}/{total})",
+    "updated": "Topic updated",
     "deleted": "Topic removed",
     "renamed": "Topic name updated",
     "accountCount": "Accounts",

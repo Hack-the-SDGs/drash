@@ -241,6 +241,7 @@
     "deleted": "組別已刪除",
     "updated": "組別已更新",
     "syncSummary": "新增 {created}、刪除 {deleted}、改密碼 {updated}",
+    "progress": "處理帳號中…（{done}/{total}）",
     "syncErrors": "{count} 個帳號操作失敗"
   },
   "topics": {
@@ -262,6 +263,10 @@
     "deleteTopicConfirm": "確定移除題目「{name}」？此題目產生的使用者與玩家也會一併刪除。",
     "noTopics": "尚無題目，點右上角新增",
     "created": "題目已建立（新增 {created} 個帳號）",
+    "creating": "建立帳號中…（{created}/{total}）",
+    "deleting": "移除帳號中…（{deleted}/{total}）",
+    "updating": "更新帳號中…（{done}/{total}）",
+    "updated": "題目已更新",
     "deleted": "題目已移除",
     "renamed": "題目名稱已更新",
     "accountCount": "帳號數量",

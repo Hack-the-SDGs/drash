@@ -9,6 +9,7 @@ import {
   accountsForTopicInGroup,
   accountsForTopic,
   expectedUsernamesForTopic,
+  expandBots,
   personalUsername,
   personalPassword,
   groupUsername,
@@ -131,71 +132,121 @@ async function setLock(
 }
 
 /**
- * Apply a topic's bot-count change: delete accounts no longer expected and
- * create the newly added ones (matching the topic's open/locked state).
- * Crossing the 1↔N boundary renames the bare account, which Drasl can't do in
- * place, so the old user is recreated — acceptable here since these are derived
- * bot accounts (players are recreated same-name, no OIDC, tokens are ephemeral).
+ * Reconcile a topic's accounts toward its new bot count, at most `chunkSize`
+ * operations per call (1 `getUsers` + ≤`chunkSize` delete/create subrequests),
+ * so a big change stays under the Workers 50-subrequest limit. Deletes the
+ * accounts no longer expected and creates the newly added ones; crossing the
+ * 1↔N boundary renames the bare account (Drasl can't rename in place, so the old
+ * user is recreated — fine for derived bot accounts). The caller passes the old
+ * topic (so the removed name set stays derivable) and loops until remaining 0.
  */
-export async function syncUpdateTopicBotCount(
+export async function syncUpdateTopicBotCountChunk(
   oldTopic: Topic,
   newTopic: Topic,
   groups: Group[],
   managed: Set<string>,
-): Promise<SyncResult> {
-  const r = emptyResult();
-  const map = await usernameMap();
+  chunkSize: number,
+): Promise<ChunkResult> {
   const oldNames = new Set(expectedUsernamesForTopic(oldTopic, groups));
   const newAccounts = await accountsForTopic(groups, newTopic);
   const newNames = new Set(newAccounts.map((a) => a.username));
+  // Delete owned old names that are no longer wanted; create wanted names we
+  // don't own yet. The two sets are disjoint (a name can't be both).
+  const remainingOps = () =>
+    [...oldNames].filter((n) => !newNames.has(n) && managed.has(n)).length +
+    newAccounts.filter((a) => !managed.has(a.username)).length;
 
-  const toDelete = [...oldNames].filter((n) => !newNames.has(n));
-  const toCreate = newAccounts.filter((a) => !oldNames.has(a.username));
-  await runPool(toDelete, SYNC_CONCURRENCY, (n) => deleteIfPresent(n, map, r, managed));
-  await runPool(toCreate, SYNC_CONCURRENCY, (a) =>
-    createIfAbsent(a.username, a.password, map, r, managed, !newTopic.open),
-  );
-  return r;
+  const before = remainingOps();
+  const r = emptyResult();
+  if (before === 0) return { result: r, total: before, before, remaining: 0 };
+
+  const map = await usernameMap();
+  const toDelete = [...oldNames].filter((n) => !newNames.has(n) && managed.has(n));
+  const delNow = toDelete.slice(0, chunkSize);
+  await runPool(delNow, SYNC_CONCURRENCY, (n) => deleteIfPresent(n, map, r, managed));
+  const createBudget = chunkSize - delNow.length;
+  if (createBudget > 0) {
+    const toCreate = newAccounts.filter((a) => !managed.has(a.username)).slice(0, createBudget);
+    await runPool(toCreate, SYNC_CONCURRENCY, (a) =>
+      createIfAbsent(a.username, a.password, map, r, managed, !newTopic.open),
+    );
+  }
+  return { result: r, total: before, before, remaining: remainingOps() };
 }
 
-/** Lock (close) or unlock (open) every existing account of a topic. */
-export async function syncSetTopicLock(
+/**
+ * Lock (close) or unlock (open) up to `chunkSize` of a topic's accounts that
+ * aren't already at the target state, per call (1 `getUsers` + ≤`chunkSize`
+ * `updateUser` subrequests), so toggling a big topic stays under the Workers
+ * 50-subrequest limit. Each call refetches state and only touches accounts still
+ * mismatched, so it's naturally idempotent; the caller loops until remaining 0.
+ */
+export async function syncSetTopicLockChunk(
   topic: Topic,
   groups: Group[],
   locked: boolean,
   managed: Set<string>,
-): Promise<SyncResult> {
-  const r = emptyResult();
+  chunkSize: number,
+): Promise<ChunkResult> {
+  const names = expectedUsernamesForTopic(topic, groups);
   const map = await usernameMap();
-  await runPool(expectedUsernamesForTopic(topic, groups), SYNC_CONCURRENCY, (username) =>
-    setLock(username, locked, map, r, managed),
-  );
-  return r;
+  // Ours, exists, and not already at the target lock state.
+  const todo = names.filter((n) => {
+    if (!managed.has(n)) return false;
+    const u = map.get(n);
+    return u !== undefined && u.isLocked !== locked;
+  });
+  const before = todo.length;
+  const r = emptyResult();
+  if (before === 0) return { result: r, total: names.length, before, remaining: 0 };
+  await runPool(todo.slice(0, chunkSize), SYNC_CONCURRENCY, (n) => setLock(n, locked, map, r, managed));
+  // `map` is a snapshot (not refreshed after updates); remaining = still-needed
+  // minus this call's successes. The next call recomputes from fresh state.
+  const remaining = before - r.updated;
+  return { result: r, total: names.length, before, remaining };
 }
 
-/** Create every account a new topic implies across all groups. */
-export async function syncCreateTopic(
+export interface ChunkResult {
+  result: SyncResult;
+  total: number; // accounts the topic needs in total
+  before: number; // accounts still missing before this chunk ran
+  remaining: number; // accounts still missing after this chunk
+}
+
+/**
+ * Create up to `chunkSize` of a topic's not-yet-owned accounts. Each call makes
+ * 1 `getUsers` + at most `chunkSize` `createUser` subrequests, so a large topic
+ * (e.g. 69 personal accounts) can be built across several requests without
+ * tripping the Cloudflare Workers 50-subrequest-per-request limit. The caller
+ * loops until `remaining === 0`. Passwords are hashed locally (no subrequests).
+ */
+export async function syncCreateTopicChunk(
   groups: Group[],
   topic: Topic,
   managed: Set<string>,
-): Promise<SyncResult> {
-  const r = emptyResult();
-  const map = await usernameMap();
+  chunkSize: number,
+): Promise<ChunkResult> {
   const accounts = await accountsForTopic(groups, topic);
-  await runPool(accounts, SYNC_CONCURRENCY, (a) =>
+  const total = accounts.length;
+  const todo = accounts.filter((a) => !managed.has(a.username));
+  const before = todo.length;
+  const r = emptyResult();
+  if (before === 0) return { result: r, total, before, remaining: 0 };
+  const map = await usernameMap();
+  await runPool(todo.slice(0, chunkSize), SYNC_CONCURRENCY, (a) =>
     createIfAbsent(a.username, a.password, map, r, managed, !topic.open),
   );
-  return r;
+  const remaining = accounts.filter((a) => !managed.has(a.username)).length;
+  return { result: r, total, before, remaining };
 }
 
 /** Create every account a new group implies across all existing topics. */
-export async function syncCreateGroup(
+export async function syncCreateGroupChunk(
   group: Group,
   topics: Topic[],
   managed: Set<string>,
-): Promise<SyncResult> {
-  const r = emptyResult();
-  const map = await usernameMap();
+  chunkSize: number,
+): Promise<ChunkResult> {
   // Flatten across topics, carrying each topic's locked state per account.
   const plan = (
     await Promise.all(
@@ -204,62 +255,112 @@ export async function syncCreateGroup(
       ),
     )
   ).flat();
-  await runPool(plan, SYNC_CONCURRENCY, (a) =>
+  const total = plan.length;
+  const todo = plan.filter((a) => !managed.has(a.username));
+  const before = todo.length;
+  const r = emptyResult();
+  if (before === 0) return { result: r, total, before, remaining: 0 };
+  const map = await usernameMap();
+  await runPool(todo.slice(0, chunkSize), SYNC_CONCURRENCY, (a) =>
     createIfAbsent(a.username, a.password, map, r, managed, a.locked),
   );
-  return r;
-}
-
-/** Delete the given usernames if they exist and are ours. */
-export async function syncDeleteUsernames(
-  usernames: string[],
-  managed: Set<string>,
-): Promise<SyncResult> {
-  const r = emptyResult();
-  const map = await usernameMap();
-  await runPool(usernames, SYNC_CONCURRENCY, (name) => deleteIfPresent(name, map, r, managed));
-  return r;
+  const remaining = plan.filter((a) => !managed.has(a.username)).length;
+  return { result: r, total, before, remaining };
 }
 
 /**
- * Cascade a group renumber (oldNumber -> group.number).
- * Personal-topic usernames don't contain the group number, so only their
- * password changes (in-place PATCH). Group-topic usernames do change, so the
- * old user is deleted and a new one created (username is immutable in Drasl).
- * The replacement inherits the topic's open/locked state.
+ * Delete up to `chunkSize` of the given usernames that are ours, per call (1
+ * `getUsers` + ≤`chunkSize` `deleteUser` subrequests), so removing a big topic
+ * stays under the Workers 50-subrequest limit. The caller loops until remaining
+ * 0. `total` is the full name count; `remaining` counts names still owned.
  */
-export async function syncRenumberGroup(
+export async function syncDeleteUsernamesChunk(
+  usernames: string[],
+  managed: Set<string>,
+  chunkSize: number,
+): Promise<ChunkResult> {
+  const todo = usernames.filter((n) => managed.has(n));
+  const before = todo.length;
+  const r = emptyResult();
+  if (before === 0) return { result: r, total: usernames.length, before, remaining: 0 };
+  const map = await usernameMap();
+  await runPool(todo.slice(0, chunkSize), SYNC_CONCURRENCY, (n) => deleteIfPresent(n, map, r, managed));
+  const remaining = usernames.filter((n) => managed.has(n)).length;
+  return { result: r, total: usernames.length, before, remaining };
+}
+
+/**
+ * Cascade a group renumber (oldNumber -> group.number), `chunkSize` ops per call.
+ * Group-topic usernames change → delete old + create new (detectable via the
+ * registry). Personal-topic usernames don't change, only the password does (an
+ * in-place PATCH that isn't detectable), so this is offset-based: the caller
+ * passes how many ops are done and loops until `done`. `renamesRemaining` lets
+ * the caller gate persistence on the (detectable, destructive) group renames.
+ */
+export interface RenumberChunkResult {
+  result: SyncResult;
+  total: number;
+  offset: number; // ops processed so far (new offset)
+  done: boolean;
+  renamesRemaining: number; // group-topic renames not yet applied
+}
+
+export async function syncRenumberGroupChunk(
   oldNumber: string,
   group: Group,
   topics: Topic[],
   managed: Set<string>,
-): Promise<SyncResult> {
-  const r = emptyResult();
-  const map = await usernameMap();
-  for (const t of topics) {
-    if (t.type === "personal") {
-      for (const m of group.members) {
-        await setPassword(
-          personalUsername(m, t.code),
-          await personalPassword(group.number, m),
-          map,
-          r,
-          managed,
-        );
-      }
-    } else {
-      await deleteIfPresent(groupUsername(oldNumber, t.code), map, r, managed);
-      await createIfAbsent(
-        groupUsername(group.number, t.code),
-        await groupPassword(group.number),
-        map,
-        r,
-        managed,
-        !t.open,
-      );
+  offset: number,
+  chunkSize: number,
+): Promise<RenumberChunkResult> {
+  type Op =
+    | { kind: "delete"; username: string }
+    | { kind: "create"; username: string; password: string; locked: boolean }
+    | { kind: "password"; username: string; password: string };
+  const ops: Op[] = [];
+  const groupTopics = topics.filter((t) => t.type === "group");
+  // Stable order: delete old group accounts, create new ones, then re-password
+  // personal accounts. Delete/create names are disjoint, so a concurrent chunk
+  // never races the same name.
+  for (const t of groupTopics) {
+    for (const name of expandBots(groupUsername(oldNumber, t.code), t.botCount)) {
+      ops.push({ kind: "delete", username: name });
     }
   }
-  return r;
+  for (const t of groupTopics) {
+    const password = await groupPassword(group.number);
+    for (const name of expandBots(groupUsername(group.number, t.code), t.botCount)) {
+      ops.push({ kind: "create", username: name, password, locked: !t.open });
+    }
+  }
+  for (const t of topics) {
+    if (t.type !== "personal") continue;
+    for (const m of group.members) {
+      const password = await personalPassword(group.number, m);
+      for (const username of expandBots(personalUsername(m, t.code), t.botCount)) {
+        ops.push({ kind: "password", username, password });
+      }
+    }
+  }
+
+  const total = ops.length;
+  const r = emptyResult();
+  const slice = ops.slice(offset, offset + chunkSize);
+  if (slice.length > 0) {
+    const map = await usernameMap();
+    await runPool(slice, SYNC_CONCURRENCY, (op) => {
+      if (op.kind === "delete") return deleteIfPresent(op.username, map, r, managed);
+      if (op.kind === "create")
+        return createIfAbsent(op.username, op.password, map, r, managed, op.locked);
+      return setPassword(op.username, op.password, map, r, managed);
+    });
+  }
+  const newOffset = offset + slice.length;
+  const oldNames = groupTopics.flatMap((t) => expandBots(groupUsername(oldNumber, t.code), t.botCount));
+  const newNames = groupTopics.flatMap((t) => expandBots(groupUsername(group.number, t.code), t.botCount));
+  const renamesRemaining =
+    oldNames.filter((n) => managed.has(n)).length + newNames.filter((n) => !managed.has(n)).length;
+  return { result: r, total, offset: newOffset, done: newOffset >= total, renamesRemaining };
 }
 
 /**
@@ -271,31 +372,51 @@ export async function syncRenumberGroup(
  * ponytail: cross-request races (two admins moving the same member at once) are
  * inherent to KV's lack of CAS — move group config to D1 if that matters.
  */
-export async function syncUpdateMembers(
+export async function syncUpdateMembersChunk(
   group: Group,
   addedMembers: string[],
   removedMembers: string[],
   personalTopics: Topic[],
   managed: Set<string>,
-): Promise<SyncResult> {
+  chunkSize: number,
+): Promise<ChunkResult> {
+  // expandBots so botCount>1 personal topics get every suffixed account.
+  const delNames = personalTopics.flatMap((t) =>
+    removedMembers.flatMap((m) => expandBots(personalUsername(m, t.code), t.botCount)),
+  );
+  const createAccounts = (
+    await Promise.all(
+      personalTopics.flatMap((t) =>
+        addedMembers.map(async (m) => {
+          const password = await personalPassword(group.number, m);
+          return expandBots(personalUsername(m, t.code), t.botCount).map((username) => ({
+            username,
+            password,
+            locked: !t.open,
+          }));
+        }),
+      ),
+    )
+  ).flat();
+  const remainingOps = () =>
+    delNames.filter((n) => managed.has(n)).length +
+    createAccounts.filter((a) => !managed.has(a.username)).length;
+
+  const before = remainingOps();
   const r = emptyResult();
+  if (before === 0) return { result: r, total: before, before, remaining: 0 };
+
   const map = await usernameMap();
-  const toDelete = personalTopics.flatMap((t) =>
-    removedMembers.map((m) => personalUsername(m, t.code)),
-  );
-  const toCreate = await Promise.all(
-    personalTopics.flatMap((t) =>
-      addedMembers.map(async (m) => ({
-        username: personalUsername(m, t.code),
-        password: await personalPassword(group.number, m),
-        locked: !t.open,
-      })),
-    ),
-  );
-  // Deletes must fully finish before any create, so a freed name is gone first.
-  await runPool(toDelete, SYNC_CONCURRENCY, (name) => deleteIfPresent(name, map, r, managed));
-  await runPool(toCreate, SYNC_CONCURRENCY, (a) =>
-    createIfAbsent(a.username, a.password, map, r, managed, a.locked),
-  );
-  return r;
+  // Deletes first (added/removed member sets are disjoint, so no name reuse),
+  // then creates within the leftover budget.
+  const delTodo = delNames.filter((n) => managed.has(n)).slice(0, chunkSize);
+  await runPool(delTodo, SYNC_CONCURRENCY, (n) => deleteIfPresent(n, map, r, managed));
+  const createBudget = chunkSize - delTodo.length;
+  if (createBudget > 0) {
+    const createTodo = createAccounts.filter((a) => !managed.has(a.username)).slice(0, createBudget);
+    await runPool(createTodo, SYNC_CONCURRENCY, (a) =>
+      createIfAbsent(a.username, a.password, map, r, managed, a.locked),
+    );
+  }
+  return { result: r, total: before, before, remaining: remainingOps() };
 }

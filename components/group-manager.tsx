@@ -65,30 +65,124 @@ export function GroupManager({ groups, stats }: GroupManagerProps) {
   // Display groups ordered by number, smallest first.
   const sortedGroups = [...groups].sort((a, b) => Number(a.number) - Number(b.number));
 
-  /** Run an action, surface the result, and refresh the server data on success. */
-  function run(action: () => Promise<GroupActionResult>, onDone: () => void) {
+  /**
+   * Drive a chunked group action to completion: re-call it until `done`, showing
+   * live progress and accumulating the create/delete/update counts. Stops if a
+   * round makes no progress. `onDone` always runs (refresh + cleanup).
+   */
+  function runChunked(action: () => Promise<GroupActionResult>, onDone: () => void) {
     startTransition(async () => {
-      const result = await action();
-      if (!result.success) {
-        toast.error(result.error ?? dict.errors.unknown);
-        return;
-      }
-      if (result.sync) {
-        const { created, deleted, updated, errors } = result.sync;
-        toast.success(
-          dict.groups.syncSummary
-            .replace("{created}", String(created))
-            .replace("{deleted}", String(deleted))
-            .replace("{updated}", String(updated)),
-        );
-        if (errors.length > 0) {
-          toast.error(dict.groups.syncErrors.replace("{count}", String(errors.length)));
+      const id = toast.loading(dict.groups.progress.replace("{done}", "0").replace("{total}", "…"));
+      let total = 0;
+      let created = 0;
+      let deleted = 0;
+      let updated = 0;
+      let prevRemaining = Infinity;
+      try {
+        for (let guard = 0; guard < 500; guard++) {
+          const res = await action();
+          created += res.created ?? 0;
+          deleted += res.deleted ?? 0;
+          updated += res.updated ?? 0;
+          if (res.done) {
+            toast.success(
+              created + deleted + updated > 0
+                ? dict.groups.syncSummary
+                    .replace("{created}", String(created))
+                    .replace("{deleted}", String(deleted))
+                    .replace("{updated}", String(updated))
+                : dict.groups.updated,
+              { id },
+            );
+            return;
+          }
+          // No chunk ran (validation/conflict) → surface and stop.
+          if (res.total === undefined) {
+            toast.error(res.error ?? dict.errors.unknown, { id });
+            return;
+          }
+          if (total === 0) total = res.total;
+          // Stuck = the server's remaining didn't shrink. Using remaining (not the
+          // op count) counts registry-only prunes as progress, so a chunk that
+          // deletes phantom names doesn't read as stuck.
+          const remaining = res.remaining ?? 0;
+          if (remaining >= prevRemaining) {
+            toast.error(res.error ?? dict.errors.unknown, { id });
+            return;
+          }
+          prevRemaining = remaining;
+          toast.loading(
+            dict.groups.progress
+              .replace("{done}", String(total - remaining))
+              .replace("{total}", String(total)),
+            { id },
+          );
         }
-      } else {
-        toast.success(dict.groups.updated);
+        toast.error(dict.errors.unknown, { id }); // guard exhausted (unreachable in practice)
+      } finally {
+        onDone();
+        router.refresh();
       }
-      onDone();
-      router.refresh();
+    });
+  }
+
+  /**
+   * Like runChunked but offset-based, for renumber: its personal-password PATCHes
+   * aren't state-detectable, so the client passes how many ops are done and loops
+   * until `done` (a single pass over the op list). Errors are surfaced at the end.
+   */
+  function runOffset(
+    action: (offset: number) => Promise<GroupActionResult>,
+    onDone: () => void,
+  ) {
+    startTransition(async () => {
+      const id = toast.loading(dict.groups.progress.replace("{done}", "0").replace("{total}", "…"));
+      let offset = 0;
+      let total = 0;
+      let created = 0;
+      let deleted = 0;
+      let updated = 0;
+      let errorCount = 0;
+      try {
+        for (let guard = 0; guard < 500; guard++) {
+          const res = await action(offset);
+          if (res.total === undefined) {
+            // Validation/lookup error — no chunk ran.
+            toast.error(res.error ?? dict.errors.unknown, { id });
+            return;
+          }
+          offset = res.offset ?? offset;
+          total = res.total;
+          created += res.created ?? 0;
+          deleted += res.deleted ?? 0;
+          updated += res.updated ?? 0;
+          errorCount += res.sync?.errors.length ?? 0;
+          if (res.done) {
+            if (errorCount > 0) {
+              toast.error(dict.groups.syncErrors.replace("{count}", String(errorCount)), { id });
+            } else {
+              toast.success(
+                created + deleted + updated > 0
+                  ? dict.groups.syncSummary
+                      .replace("{created}", String(created))
+                      .replace("{deleted}", String(deleted))
+                      .replace("{updated}", String(updated))
+                  : dict.groups.updated,
+                { id },
+              );
+            }
+            return;
+          }
+          toast.loading(
+            dict.groups.progress.replace("{done}", String(offset)).replace("{total}", String(total)),
+            { id },
+          );
+        }
+        toast.error(dict.errors.unknown, { id }); // guard exhausted (unreachable in practice)
+      } finally {
+        onDone();
+        router.refresh();
+      }
     });
   }
 
@@ -173,7 +267,7 @@ export function GroupManager({ groups, stats }: GroupManagerProps) {
         onOpenChange={setCreateOpen}
         pending={isPending}
         onSubmit={(number, members) =>
-          run(() => createGroupAction(number, members), () => setCreateOpen(false))
+          runChunked(() => createGroupAction(number, members), () => setCreateOpen(false))
         }
       />
 
@@ -183,8 +277,8 @@ export function GroupManager({ groups, stats }: GroupManagerProps) {
         onClose={() => setRenumberTarget(null)}
         pending={isPending}
         onSubmit={(newNumber) =>
-          run(
-            () => renumberGroupAction(renumberTarget!.number, newNumber),
+          runOffset(
+            (offset) => renumberGroupAction(renumberTarget!.number, newNumber, offset),
             () => setRenumberTarget(null),
           )
         }
@@ -196,7 +290,7 @@ export function GroupManager({ groups, stats }: GroupManagerProps) {
         onClose={() => setMembersTarget(null)}
         pending={isPending}
         onSubmit={(members) =>
-          run(
+          runChunked(
             () => updateMembersAction(membersTarget!.number, members),
             () => setMembersTarget(null),
           )
@@ -213,7 +307,7 @@ export function GroupManager({ groups, stats }: GroupManagerProps) {
         destructive
         pending={isPending}
         onConfirm={() =>
-          run(() => deleteGroupAction(deleteTarget!.number, true), () => setDeleteTarget(null))
+          runChunked(() => deleteGroupAction(deleteTarget!.number, true), () => setDeleteTarget(null))
         }
       />
     </div>
