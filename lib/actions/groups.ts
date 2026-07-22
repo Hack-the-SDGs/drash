@@ -15,8 +15,9 @@ import type { Group } from "@/lib/groups/types";
 
 const NUM = /^\d+$/;
 
-// Account operations per chunked call — 1 getUsers + <=40 create/delete keeps
-// each request under the Cloudflare Workers 50-subrequest cap (the client loops).
+// Account operations per chunked call. Worst case ~43 subrequests (1 getUsers +
+// <=40 create/delete/update + KV read + KV write), under the Cloudflare Workers
+// 50-subrequest cap (the client loops).
 const CHUNK = 40;
 
 export interface GroupActionResult {
@@ -171,9 +172,11 @@ export async function renumberGroupAction(
 
   // Commit the new number once the whole op list is processed AND every group
   // account has actually been renamed. The renames are destructive, so once they
-  // land, config MUST match them even if a personal-password PATCH failed (a
-  // stale password is recoverable; a mismatched group number would strand
-  // accounts). If a rename itself failed, keep the old number so a retry resumes.
+  // land, config MUST match them even if a personal-password PATCH failed — a
+  // mismatched group number would strand accounts, whereas a stale password is
+  // recoverable by removing and re-adding that member (which recreates their
+  // accounts with the current number's password). If a rename itself failed,
+  // keep the old number so a re-run resumes from the same baseline.
   const persistNumber = done && renamesRemaining === 0;
   const groups = persistNumber
     ? config.groups.map((g) => (g.number === oldNumber ? updated : g))

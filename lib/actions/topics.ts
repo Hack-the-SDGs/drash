@@ -15,9 +15,10 @@ import { MAX_BOT_COUNT, type Topic, type TopicType } from "@/lib/groups/types";
 
 const CODE = /^[a-z0-9_]+$/;
 
-// Account operations per chunked call. 1 getUsers + <=40 create/delete/update =
-// 41 subrequests, safely under the Cloudflare Workers free-plan cap of 50 per
-// request. Big topics are built/changed/removed over several calls (client loops).
+// Account operations per chunked call. Worst case ~43 subrequests (1 getUsers +
+// <=40 create/delete/update + KV read + KV write), safely under the Cloudflare
+// Workers free-plan cap of 50. Big topics are built/changed/removed over several
+// calls (the client loops).
 const CHUNK = 40;
 
 export interface TopicActionResult {

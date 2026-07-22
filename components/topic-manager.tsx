@@ -93,23 +93,32 @@ export function TopicManager({ topics, stats }: TopicManagerProps) {
       const id = toast.loading(progress(0, 0));
       let total = 0;
       let processed = 0;
+      let prevRemaining = Infinity;
       try {
         // Guard against an unbounded loop (500 chunks × 40 ≫ any real topic).
         for (let guard = 0; guard < 500; guard++) {
           const res = await action();
-          const step = (res.created ?? 0) + (res.deleted ?? 0) + (res.updated ?? 0);
-          processed += step;
-          if (total === 0 && res.total) total = res.total;
+          processed += (res.created ?? 0) + (res.deleted ?? 0) + (res.updated ?? 0);
           if (res.done) {
             toast.success(success(processed), { id });
             return;
           }
-          if (step === 0) {
-            // Validation/conflict, or a round that made no progress → stuck.
+          // No chunk ran (validation/conflict) → surface and stop.
+          if (res.total === undefined) {
             toast.error(res.error ?? dict.errors.unknown, { id });
             return;
           }
-          toast.loading(progress(total - (res.remaining ?? 0), total), { id });
+          if (total === 0) total = res.total;
+          // Stuck = the server's remaining didn't shrink. Using remaining (not the
+          // op count) counts registry-only prunes as progress, so a chunk that
+          // deletes phantom names doesn't read as stuck.
+          const remaining = res.remaining ?? 0;
+          if (remaining >= prevRemaining) {
+            toast.error(res.error ?? dict.errors.unknown, { id });
+            return;
+          }
+          prevRemaining = remaining;
+          toast.loading(progress(total - remaining, total), { id });
         }
         toast.error(dict.errors.unknown, { id }); // guard exhausted (unreachable in practice)
       } finally {

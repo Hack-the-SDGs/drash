@@ -77,14 +77,13 @@ export function GroupManager({ groups, stats }: GroupManagerProps) {
       let created = 0;
       let deleted = 0;
       let updated = 0;
+      let prevRemaining = Infinity;
       try {
         for (let guard = 0; guard < 500; guard++) {
           const res = await action();
-          const step = (res.created ?? 0) + (res.deleted ?? 0) + (res.updated ?? 0);
           created += res.created ?? 0;
           deleted += res.deleted ?? 0;
           updated += res.updated ?? 0;
-          if (total === 0 && res.total) total = res.total;
           if (res.done) {
             toast.success(
               created + deleted + updated > 0
@@ -97,13 +96,24 @@ export function GroupManager({ groups, stats }: GroupManagerProps) {
             );
             return;
           }
-          if (step === 0) {
+          // No chunk ran (validation/conflict) → surface and stop.
+          if (res.total === undefined) {
             toast.error(res.error ?? dict.errors.unknown, { id });
             return;
           }
+          if (total === 0) total = res.total;
+          // Stuck = the server's remaining didn't shrink. Using remaining (not the
+          // op count) counts registry-only prunes as progress, so a chunk that
+          // deletes phantom names doesn't read as stuck.
+          const remaining = res.remaining ?? 0;
+          if (remaining >= prevRemaining) {
+            toast.error(res.error ?? dict.errors.unknown, { id });
+            return;
+          }
+          prevRemaining = remaining;
           toast.loading(
             dict.groups.progress
-              .replace("{done}", String(total - (res.remaining ?? 0)))
+              .replace("{done}", String(total - remaining))
               .replace("{total}", String(total)),
             { id },
           );
